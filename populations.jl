@@ -6,8 +6,9 @@ module populations
 export Individual, Population
 export mean_genotype, mean_phenotype, next_gen
 
-using Distributions
+# import base functions for multiple dispatch
 import Base.copy, Base.copy!
+using Distributions
 
 # base type for individuals in the population
 type Individual
@@ -77,17 +78,16 @@ type Population
     env_state::Array{Float64,1}
 
     # Constructor
-    ## geno function is used to initialize genotypes to arbitrary values
+    ## geno_func function is used to initialize genotypes
     ## e.g., ()->[rand()] initializes each genotype to a random value in (0,1)
     function Population(size::Int64,
-                        pheno_func::Function, npheno::Int64,
-                        fit_func::Function, mut_func::Function,
+                        pheno_func::Function, fit_func::Function, mut_func::Function,
                         geno_func::Function, env_func::Function, env0::Array{Float64,1})
         
         members = Array{Individual}(size)
         for i=1:size
-            g = geno_func()
-            ind = Individual(0, g, Array(Float64,npheno))
+            g = geno_func(i)
+            ind = Individual(0, g, Array(Float64,0))
             pheno_func(ind, env0)
             members[i] = ind
         end
@@ -151,6 +151,9 @@ end
 ###
 ### Main life cycle function:
 ### iterate through the lifecycle of the population once
+### 1. fitness calculated
+### 2. survival
+### 3. fertility 
 ###
 function next_gen(pop::Population)
     # save initial population state in "prev" vector
