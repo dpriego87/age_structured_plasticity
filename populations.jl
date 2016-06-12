@@ -68,6 +68,7 @@ end
 type Population
     size::Int64
     pheno_func::Function            # map genotype to phenotype
+    npheno::Int64                   # length of phenotype vector
     fit_func::Function              # map phenotype to fitness
     mut_func::Function              # mutate genotype
     members::Array{Individual,1}
@@ -81,19 +82,20 @@ type Population
     ## geno_func function is used to initialize genotypes
     ## e.g., ()->[rand()] initializes each genotype to a random value in (0,1)
     function Population(size::Int64,
-                        pheno_func::Function, fit_func::Function, mut_func::Function,
-                        geno_func::Function, env_func::Function, env0::Array{Float64,1})
+                        pheno_func::Function, npheno::Int64, fit_func::Function,
+                        mut_func::Function, geno_func::Function,
+                        env_func::Function, env0::Array{Float64,1})
         
         members = Array{Individual}(size)
         for i=1:size
             g = geno_func(i)
-            ind = Individual(0, g, Array(Float64,0))
+            ind = Individual(0, g, Array{Float64}(npheno))
             pheno_func(ind, env0)
             members[i] = ind
         end
         members_prev = copy(members)
 
-        new(size, pheno_func, fit_func, mut_func, members, members_prev,
+        new(size, pheno_func, npheno, fit_func, mut_func, members, members_prev,
             hcat(fill(1, size), fill(1/size, size)), [1.0,1/size],
             env_func, env0)
     end
@@ -111,11 +113,11 @@ function calc_pheno_fitness(pop::Population)
     for i = 1:pop.size
         pop.pheno_func(pop.members[i], pop.env_state)
         pop.fit_func(pop.members[i], pop.env_state)
-        pop.fitness[i,:] = pop.members[i].fitness
-        pop.mean_fit += pop.members[i].fitness
+        pop.fitness[i,1] = pop.members[i].fitness[1]
+        pop.fitness[i,2] = pop.members[i].fitness[2]
+        pop.mean_fit[1] += pop.members[i].fitness[1] / pop.size
+        pop.mean_fit[2] += pop.members[i].fitness[2] / pop.size
     end
-
-    pop.mean_fit /= pop.size
 end
 
 function mean_genotype(pop::Population)
@@ -166,8 +168,8 @@ function next_gen(pop::Population)
     # get normalized fertility
     norm_fert = pop.fitness[:,2] / (pop.mean_fit[2] * pop.size)
     
-    # set categorical distribution using normalized fertilities
-    fertdist = Categorical(norm_fert)
+    # set categorical distribution using normalized fertilities ("sampler" uses "AliasTable")
+    fertdist = sampler(Categorical(norm_fert))
 
     # survival and reproduction
     for i=1:pop.size
@@ -178,7 +180,8 @@ function next_gen(pop::Population)
             # individual dies and is replaced by random new born 
             pop.members[i].age = 0
             parent = rand(fertdist)
-            pop.members[i].genotype = pop.mut_func(pop.members_prev[parent])::Array{Float64,1}
+            #pop.members[i].genotype = pop.mut_func(pop.members_prev[parent])::Array{Float64,1}
+            pop.mut_func(pop.members[i], pop.members_prev[parent]) # offspring, parent
         end
     end
     

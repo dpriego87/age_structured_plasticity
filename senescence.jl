@@ -68,7 +68,7 @@ end
 ##
 
 function phenof(i,e)
-    i.phenotype = [2.0]
+    i.phenotype[1] = 2.0
 end
 
 function fitf(i,e)
@@ -76,14 +76,14 @@ function fitf(i,e)
     i.fitness[2] = 1.0
 end
 
-function mutf(i::Individual)
-    return copy(i.genotype)
+function mutf(offspring::Individual, parent::Individual)
+    copy!(offspring.genotype, parent.genotype)
 end
 
 p = Population(# population size
                100,
-               # genotype->phenotype map
-               phenof,
+               # genotype->phenotype map, number of phenotypes
+               phenof, 1, 
                # fitness function
                fitf,
                # mutation function
@@ -115,7 +115,7 @@ plot(freq0, conf[1:end,2], color="black", linestyle="--")
 ##
 
 function phenof(i,e)
-    i.phenotype = [0.0]
+    i.phenotype[1] = 0.0
 end
 
 function fitf(i,e)
@@ -123,15 +123,15 @@ function fitf(i,e)
     i.fitness[2] = 1.0 + i.genotype[1]
 end
 
-function mutf(i)
-    return copy(i.genotype)
+function mutf(offspring::Individual, parent::Individual)
+    copy!(offspring.genotype, parent.genotype)
 end
 
 
 p = Population(# population size
                100,
-               # genotype->phenotype map
-               phenof,
+               # genotype->phenotype map, number of phenotypes
+               phenof, 1, 
                # fitness function
                fitf,
                # mutation function
@@ -170,7 +170,7 @@ plot(freq0, conf[1:end,2], color="black", linestyle="--")
 ##
 
 function phenof(i::Individual,e)
-    i.phenotype = [0.0]
+    i.phenotype[1] = 0.0
 end
 
 s1 = 0.99
@@ -192,8 +192,8 @@ function fitf(i::Individual,e)
     i.fitness[2] = 1.0
 end
 
-function mutf(i::Individual)
-    return copy(i.genotype)
+function mutf(offspring::Individual, parent::Individual)
+    copy!(offspring.genotype, parent.genotype)
 end
 
 function stableAgeDist(s1,s2,s3)
@@ -261,8 +261,8 @@ end
 
 p = Population(# population size
                100,
-               # genotype->phenotype map
-               phenof,
+               # genotype->phenotype map, number of phenotypes
+               phenof, 1, 
                # fitness function
                fitf,
                # mutation function
@@ -277,14 +277,14 @@ ages = [0, 1, 2, 3]
 prob = Array(Float64, length(ages))
 for i=1:length(ages)
     println("age: ", ages[i])
-    prob[i] = fixation(p, ages[i], 5000, 1000)
+    prob[i] = fixation(p, ages[i], 10000, 1000)
 end
 
 # plot with 95% confidence intervals
 using PyPlot
 
 eprob = fixationProbAge(s1,s2,s3,p.size)
-conf = binomialConf(eprob, 5000, 0.05)
+conf = binomialConf(eprob, 10000, 0.05)
 plot(ages, eprob, color="blue", linestyle="-")
 plot(ages, prob, color="black", linestyle="-")
 plot(ages, conf[1:end,1], color="black", linestyle="--")
@@ -305,23 +305,29 @@ venv = 0.1
 arθ = 0.75
 vmut = 0.01
 
-function phenof(i,e)
-    i.phenotype = linear_norm_g(i.genotype, e, ve)
+function phenof(i::Individual,e)
+    copy!(i.phenotype, linear_norm_g(i.genotype, e, ve))
+    #i.phenotype = linear_norm_g(i.genotype, e, ve)
 end
 
-function fitf(i,e)
+function fitf(i::Individual,e)
     i.fitness[1] = 0.0
     i.fitness[2] = gauss_purify_cost_linear_norm(i.phenotype, e, [A, B], γ, γb, wmax)
 end
 
-function mutf(i)
-    return i.genotype + rand(Normal(0.0,vmut), size(i.genotype))
+function mutf(offspring::Individual, parent::Individual)
+    copy!(offspring.genotype, parent.genotype)
+end
+
+function mutf(offspring::Individual, parent::Individual)
+    copy!(offspring.genotype,
+          parent.genotype + rand(Normal(0.0,vmut), size(parent.genotype)))
 end
 
 p = Population(# population size
                250,
                # genotype->phenotype map
-               phenof,
+               phenof, 3,
                # fitness function
                fitf,
                # mutation function
@@ -355,52 +361,3 @@ toc();
 
 landeSlopes = (A,B,γ,γb,v) -> [A, B / (1 + γb / (γ * v))]
 varAR = (arθ, venv) -> venv / (1 - arθ^2)
-
-#
-# Generation overlap and age-specific reaction norm
-# -- N.B. anonymous functions are slow in Julia right now (sucks), so write explicit functions for
-# -- those that are calculated for every individual every generation.
-#
-function phenof(i,e)
-    i.phenotype = linear_norm(i.genotype[ min(2*i.age+1,19) : min(2*i.age+2,20) ], e, 0.01)
-end
-
-# genotype->phenotype map: select genotype with age-specific expression (max age 9)
-function fitf(i,e)
-    i.fitness[1] = 0.75
-    i.fitness[2] = gauss_purify_linear_norm(i.phenotype, e, [1.0, 2.5], 3.0, 10.0)
-end
-
-function mutf(i)
-    return i.genotype + rand(Normal(0.0,0.01), size(i.genotype))
-end
-
-p = Population(# population size
-               500,
-               # genotype->phenotype map
-               phenof,
-               # fitness function
-               fitf,
-               # mutation function
-               mutf,
-               # initial genotype function
-               ()->0.01*(rand(20)-0.5),
-               # env update function
-               (e)->[1.0; autoregressive([e[2]],[0.5],0.1)],
-               # initial env state
-               [1.0, 0.0]); 
-
-tic();
-#@profile(
-         for i in 1:10000
-         next_gen(p)
-         # if i % 1000 == 0
-         #     println(p.mean_fit[2])
-         #     println(mean_genotype(p))
-         #     println(mean_phenotype(p))
-         #     println(p.env_state)
-         #     println("--")
-         # end
-         end
-#         )
-toc();
