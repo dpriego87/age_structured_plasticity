@@ -4,7 +4,7 @@
 
 module populations
 export Individual, Population
-export mean_genotype, mean_phenotype, next_gen
+export mean_genotype, mean_phenotype, age_distribution, next_gen
 
 # import base functions for multiple dispatch
 import Base.copy, Base.copy!
@@ -101,7 +101,8 @@ end
 
 # update environmental state using previous state
 function update_env_state(pop::Population)
-    pop.env_state = pop.env_func(pop.env_state)
+    pop.env_state = pop.env_func(pop.env_state)::Array{Float64,1}
+    nothing
 end
 
 function calc_pheno_fitness(pop::Population)
@@ -145,7 +146,7 @@ function age_distribution(pop::Population)
     for i=1:pop.size
         ages[i] = pop.members[i].age
     end
-    return hist(ages)
+    return hist(ages, -0.5:1:maximum(ages)+0.5)
 end
 
 ###
@@ -177,7 +178,7 @@ function next_gen(pop::Population)
             # individual dies and is replaced by random new born 
             pop.members[i].age = 0
             parent = rand(fertdist)
-            pop.members[i].genotype = pop.mut_func(pop.members_prev[parent])
+            pop.members[i].genotype = pop.mut_func(pop.members_prev[parent])::Array{Float64,1}
         end
     end
     
