@@ -15,16 +15,6 @@ using populations
 ## Test against theory from Lande (2014, JEB)
 ##
 
-## ve = 0.01
-## A = 1.0
-## B = 2.0
-## γ = 3.0
-## γb = 0.5
-## wmax = 3.0
-## venv = 0.1
-## arθ = 0.75
-## vmut = 0.01
-
 function linearPlasticityFertAgePop(n, s, ve, A, B, γ, γb, wmax, venv, arθ, vmut)
     nages = length(s)
 
@@ -72,14 +62,12 @@ end
 function runSim(p, reps, burns, iters)
     ngeno = length(p.members[1].genotype)
     nenv  = length(p.env_state)
-    m1geno = zeros((ngeno, iters))
-    m2geno = zeros((ngeno, iters))
-    m1env  = zeros((nenv, iters))
-    m2env  = zeros((nenv, iters))
+    mgeno = zeros((ngeno, reps*iters))
+    env   = zeros((nenv, reps*iters))
 
     for r = 1:reps
         # reset genotypes
-        for i in 1:p.size
+        for i = 1:p.size
             p.members[i].genotype = zeros(ngeno)
         end
         # burn-in
@@ -89,16 +77,50 @@ function runSim(p, reps, burns, iters)
         # main iteration
         for j = 1:iters
             next_gen(p)
-            m1geno[:,r] = mean_genotype(p) / iters
-            m2geno[:,r] = mean_genotype(p).^2 / iters
-            m1env[:,r]  = p.env_state / iters
-            m2env[:,r]  = p.env_state.^2 / iters
+            mgeno[:,(r-1)*iters+j] = mean_genotype(p)
+            env[:,(r-1)*iters+j]   = p.env_state
         end
         if r % round(reps / 100) == 0
             print(round(Int,100*r/reps), "% ")
         end
     end
 
-    return (m1geno, m2geno-m1geno.^2, m1geno, m2env-m1env.^2)
+    return (mgeno, env)
 end
 
+function plotBoxPlot(vals, expect, xticklab, ycolor)
+    ax = axes()
+    bp = boxplot(vals, sym="")
+    setp(bp["boxes"], color="black")
+    setp(bp["medians"], color=ycolor)
+    setp(bp["whiskers"], color="black", dashes=(3,3))
+    
+    plot(0:size(vals)[2]+1, fill(expect,size(vals)[2]+2), linestyle="--", dashes=(5,5), color=ycolor)
+    
+    ax[:set_xticklabels](xticklab)
+end
+
+## Preliminary runs -- 14.06.2016
+
+n = 500
+s = [0.5, 0.5, 0.5, 0.0]
+ve = 0.01
+A = 1.0
+B = 3.0
+γ = 3.0
+γb = 0.0
+wmax = 3.0
+venv = 0.1
+arθ = 0.9
+vmut = 0.01
+
+reps = 100
+burns = 10000
+iters = 1000
+
+p = linearPlasticityFertAgePop(n, s, ve, A, B, γ, γb, wmax, venv, arθ, vmut);
+@time (mg, env) = runSim(p, reps, burns, iters);
+
+# plot boxplots
+plotBoxPlot(mg[1:2:7,:]', landeSlope(A, B, γ, γb, venv, arθ)[1], ["0", "1", "2", "3"], "black")
+plotBoxPlot(mg[2:2:8,:]', landeSlope(A, B, γ, γb, venv, arθ)[2], ["0", "1", "2", "3"], "black")
