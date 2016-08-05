@@ -36,7 +36,7 @@ function fixation(p, freq0, reps, iters, gvals = [1.0, 0.0])
     m = 0.0
     for r in 1:reps
         if r % round(reps / 10) == 0
-            println(string(round(100*r/reps), "% iter ", r))
+            println(string(round(100*r/reps), "% rep ", r))
         end
         setInitFreq(p, freq0, gvals)
         for i in 1:iters
@@ -45,7 +45,7 @@ function fixation(p, freq0, reps, iters, gvals = [1.0, 0.0])
         m += mean_genotype(p) / reps
     end
 
-    return m
+    return m[1]
 end
 
 # binomial distribution conf intervals
@@ -93,14 +93,14 @@ tic();
 freq0 = 0.1:0.1:0.9
 prob = Array(Float64, length(freq0))
 for i=1:length(freq0)
-    prob[i] = fixation(p, freq0[i], 200, 800)
+    prob[i] = fixation(p, freq0[i], 500, 800)
 end
 toc();
 
 # plot with 95% confidence intervals
 using PyPlot
 
-conf = binomialConf(freq0, 200, 0.05)
+conf = binomialConf(freq0, 500, 0.05)
 plot(freq0, freq0, color="blue", linestyle="-")
 plot(freq0, prob, color="black", linestyle="-")
 plot(freq0, conf[1:end,1], color="black", linestyle="--")
@@ -139,9 +139,10 @@ p = Population(# population size
 
 tic();
 freq0 = 0.1:0.1:0.9
+reps = 1000
 prob = Array(Float64, length(freq0))
 for i=1:length(freq0)
-    prob[i] = fixation(p, freq0[i], 200, 800, [0.01, 0.0]) / 0.01
+    prob[i] = fixation(p, freq0[i], reps, 800, [0.01, 0.0]) / 0.01
 end
 toc();
 
@@ -153,7 +154,7 @@ function fixprob(x, n, s)
     return (1 - exp(- 2 * n * s * x)) / (1 - exp(- 2 * n * s))
 end
 
-conf = binomialConf(map((x)->fixprob(x, 100, 0.01), 0.1:0.1:0.9), 200, 0.05)
+conf = binomialConf(map((x)->fixprob(x, 100, 0.01), 0.1:0.1:0.9), reps, 0.05)
 plot(freq0, prob, color="blue", linestyle="-")
 plot(freq0, map((x)->fixprob(x, 100, 0.01), 0.1:0.1:0.9), color="black", linestyle="-")
 plot(freq0, conf[1:end,1], color="black", linestyle="--")
@@ -162,11 +163,11 @@ plot(freq0, conf[1:end,2], color="black", linestyle="--")
 
 ##
 ## fixtion probability of a neutral allele in an age-structured population
-## using theory from Emigh (1979, Genetics 92:323--337)
+## using theory from Emigh (1979, Genetics 92:323--337) and Vindenes et al (2010, Evolution)
 ##
 
 function phenof(i::Individual,e)
-    i.phenotype[1] = 0.0
+    @inbounds i.phenotype[1] = 0.0
 end
 
 s1 = 0.99
@@ -175,17 +176,19 @@ s3 = 0.1
 
 function fitf(i::Individual,e)
     # survival
-    if i.age == 0
-        i.fitness[1] = s1
-    elseif i.age == 1
-        i.fitness[1] = s2
-    elseif i.age == 2
-        i.fitness[1] = s3
-    else 
-        i.fitness[1] = 0.0
+    @inbounds begin
+        if i.age == 0
+            i.fitness[1] = s1
+        elseif i.age == 1
+            i.fitness[1] = s2
+        elseif i.age == 2
+            i.fitness[1] = s3
+        else 
+            i.fitness[1] = 0.0
+        end
+        # fertility 
+        i.fitness[2] = 1.0
     end
-    # fertility 
-    i.fitness[2] = 1.0
 end
 
 function mutf(offspring::Individual, parent::Individual)
@@ -213,7 +216,6 @@ function fixationProbAge(s1,s2,s3,psize)
     le, lv = eig(P')
     rimax = indmax(abs(re))
     limax = indmax(abs(le))
-    me = re[rimax]
     mrv = rv[:,rimax]
     mlv = lv[:,limax]
     
@@ -242,7 +244,7 @@ function fixation(p, age, reps, iters, gvals = [1.0, 0.0])
     for r in 1:reps
         setInitMut(p, age, gvals)
         if r % round(reps / 10) == 0
-            println(round(100*r/reps), "% iter ", r)
+            println(round(100*r/reps), "% rep ", r)
             toc()
             tic()
         end
@@ -252,7 +254,7 @@ function fixation(p, age, reps, iters, gvals = [1.0, 0.0])
         m += mean_genotype(p) / reps
     end
     toq()
-    return m
+    return m[1]
 end
 
 p = Population(# population size
@@ -270,17 +272,18 @@ p = Population(# population size
 
 
 ages = [0, 1, 2, 3]
+reps = 10000
 prob = Array(Float64, length(ages))
 for i=1:length(ages)
     println("age: ", ages[i])
-    prob[i] = fixation(p, ages[i], 10000, 1000)
+    prob[i] = fixation(p, ages[i], reps, 1000)
 end
 
 # plot with 95% confidence intervals
 using PyPlot
 
 eprob = fixationProbAge(s1,s2,s3,p.size)
-conf = binomialConf(eprob, 10000, 0.05)
+conf = binomialConf(eprob, reps, 0.05)
 plot(ages, eprob, color="blue", linestyle="-")
 plot(ages, prob, color="black", linestyle="-")
 plot(ages, conf[1:end,1], color="black", linestyle="--")

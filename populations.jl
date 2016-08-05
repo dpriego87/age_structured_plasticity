@@ -110,7 +110,7 @@ end
 function calc_pheno_fitness(pop::Population)
     pop.mean_fit = [0.0, 0.0]
 
-    for i = 1:pop.size
+    @inbounds for i = 1:pop.size
         pop.pheno_func(pop.members[i], pop.env_state)
         pop.fit_func(pop.members[i], pop.env_state)
         pop.fitness[i,1] = pop.members[i].fitness[1]
