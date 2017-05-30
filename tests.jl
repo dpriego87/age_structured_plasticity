@@ -289,69 +289,90 @@ plot(ages, conf[1:end,2], color="black", linestyle="--")
 ## Test against theory from Lande (2014, JEB)
 ##
 
-ve = 0.01
-A = 1.0
-B = 2.0
-γ = 3.0
-γb = 0.5
-wmax = 3.0
-venv = 0.1
-arθ = 0.75
-vmut = 0.01
+function linearPlasticity(n, ve, A, B, γ, γb, wmax, venv, arθ, vmut)
+    stdenv = sqrt(venv)
 
-function phenof(i::Individual,e)
-    copy!(i.phenotype, linear_norm_g(i.genotype, e, ve))
-    #i.phenotype = linear_norm_g(i.genotype, e, ve)
-end
-
-function fitf(i::Individual,e)
-    i.fitness[1] = 0.0
-    i.fitness[2] = gauss_purify_cost_linear_norm(i.phenotype, e, [A, B], γ, γb, wmax)
-end
-
-function mutf(offspring::Individual, parent::Individual)
-    copy!(offspring.genotype, parent.genotype)
-end
-
-function mutf(offspring::Individual, parent::Individual)
-    copy!(offspring.genotype,
-          parent.genotype + rand(Normal(0.0,vmut), size(parent.genotype)))
-end
-
-p = Population(# population size
-               250,
-               # genotype->phenotype map
-               phenof, 3,
-               # fitness function
-               fitf,
-               # mutation function
-               mutf,
-               # initial genotype function
-               (i)->zeros(2),
-               (e)->[1.0; autoregressive([e[2]],[arθ],sqrt(venv))], # env update function
-               [1.0, 0.0]); # initial env state
-
-tic();
-iters = 50000;
-mg = zeros(size(mean_genotype(p)));
-evec = zeros(iters);
-for i in 1:iters
-    next_gen(p)
-    mg += mean_genotype(p) / iters
-    evec[i] = p.env_state[2]
-    if i % 1000 == 0
-        println(p.mean_fit[2])
-        println(mean_genotype(p))
-        println(mean_phenotype(p))
-        println(p.env_state)
-        println("--")
+    function phenof(i::Individual, e)
+        copy!(i.phenotype, linear_norm_g(i.genotype, e, ve))
     end
-end
-println(string("env var: ", var(evec)));
-println(string("predicted env var: ", venv / (1 - arθ^2))); ## from variance of AR(1) process
-println(string("mean genotype: ", mg));
-println(string("predicted-actual mean genotype: ", [A, B / (1 + γb / (γ * venv / (1 - arθ^2)))] - mg[:])); ## from Lande (2014, JEB)
-toc();
 
-landeSlopes = (A,B,γ,γb,v) -> [A, B / (1 + γb / (γ * v))]
-varAR = (arθ, venv) -> venv / (1 - arθ^2)
+    function fitf(i::Individual, e)
+        i.fitness[1] = 0.0
+        i.fitness[2] = gauss_purify_cost_linear_norm(i.phenotype, e, [A, B], γ, γb, wmax)
+    end
+
+    function mutf(offspring::Individual, parent::Individual)
+        copy!(offspring.genotype,
+              parent.genotype + rand(Normal(0.0,vmut), size(parent.genotype)))
+    end
+
+    p = Population(# population size
+                   n,
+                   # genotype->phenotype map
+                   phenof, 3,
+                   # fitness function
+                   fitf,
+                   # mutation function
+                   mutf,
+                   # initial genotype function
+                   (i)->zeros(2),
+                   (e)->[1.0; autoregressive([e[2]],[arθ],stdenv)], # env update function
+                   [1.0, 0.0]); # initial env state
+
+    return p
+end
+
+
+function runSim(p, reps, burns, iters)
+    ngeno = length(p.members[1].genotype)
+    nenv  = length(p.env_state)
+    mgeno = zeros((ngeno, reps*iters))
+    env   = zeros((nenv, reps*iters))
+
+    totalruns = burns+iters
+    iterblock = round(reps * totalruns / 100)
+    
+    for r = 1:reps
+        # reset genotypes
+        for i = 1:p.size
+            p.members[i].genotype = zeros(ngeno)
+        end
+
+        for j = 1:totalruns
+            next_gen(p)
+            # record after burn in
+            if j > burns
+                mgeno[:,(r-1)*iters+j-burns] = mean_genotype(p)
+                env[:,(r-1)*iters+j-burns]   = p.env_state
+            end
+            if ((r-1)*totalruns+j) % iterblock == 0
+                print(round(Int,100.*((r-1)*totalruns+j)/(totalruns*reps)), "% ")
+            end
+        end
+    end
+
+    return (mgeno, env)
+end
+
+res = zeros(4,4)
+p = linearPlasticity(500, 0.01, 1., 2., 3., 0.0, 3., 0.1, 0.75, 0.01);
+@time (mg, env) = runSim(p, 10, 10000, 1000);
+res[1,1:2] = mean(mg,2);
+res[1,3:4] = landeSlope(1., 2., 3., 0.0, 0.1, 0.75);
+
+p = linearPlasticity(500, 0.01, 1., 2., 3., 0.5, 3., 0.1, 0.75, 0.01);
+@time (mg, env) = runSim(p, 10, 10000, 1000);
+res[2,1:2] = mean(mg,2);
+res[2,3:4] = landeSlope(1., 2., 3., 0.5, 0.1, 0.75);
+
+p = linearPlasticity(500, 0.01, 1., 2., 3., 1.0, 3., 0.1, 0.75, 0.01);
+@time (mg, env) = runSim(p, 10, 10000, 1000);
+res[3,1:2] = mean(mg,2);
+res[3,3:4] = landeSlope(1., 2., 3., 1.0, 0.1, 0.75);
+
+p = linearPlasticity(500, 0.01, 1., 2., 3., 2.0, 3., 0.1, 0.75, 0.01);
+@time (mg, env) = runSim(p, 10, 10000, 1000);
+res[4,1:2] = mean(mg,2);
+res[4,3:4] = landeSlope(1., 2., 3., 2.0, 0.1, 0.75);
+
+plot(res)

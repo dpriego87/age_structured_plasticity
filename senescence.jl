@@ -87,7 +87,7 @@ function linearPlasticityFertAgePop(n, s, ve, A, B, γ, γb, wmax, venv, arθ, v
         else
             i.fitness[1] = 0.0
         end
-        i.fitness[2] = 1 + gauss_purify_cost_linear_norm(i.phenotype, e, [A, B], γ, γb, wmax)
+        i.fitness[2] = gauss_purify_cost_linear_norm(i.phenotype, e, [A, B], γ, γb, wmax)
     end
 
     function mutf(offspring::Individual, parent::Individual)
