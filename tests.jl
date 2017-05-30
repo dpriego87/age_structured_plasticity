@@ -8,6 +8,7 @@ include("phenotype.jl")
 include("fitness.jl")
 
 using Distributions
+using PyPlot
 using populations
 
 ##
@@ -98,8 +99,6 @@ end
 toc();
 
 # plot with 95% confidence intervals
-using PyPlot
-
 conf = binomialConf(freq0, 500, 0.05)
 plot(freq0, freq0, color="blue", linestyle="-")
 plot(freq0, prob, color="black", linestyle="-")
@@ -148,8 +147,6 @@ toc();
 
 
 # plot with 95% confidence intervals using analytical fixation probability
-using PyPlot
-
 function fixprob(x, n, s)
     return (1 - exp(- 2 * n * s * x)) / (1 - exp(- 2 * n * s))
 end
@@ -280,8 +277,6 @@ for i=1:length(ages)
 end
 
 # plot with 95% confidence intervals
-using PyPlot
-
 eprob = fixationProbAge(s1,s2,s3,p.size)
 conf = binomialConf(eprob, reps, 0.05)
 plot(ages, eprob, color="blue", linestyle="-")

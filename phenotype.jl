@@ -11,7 +11,7 @@ end
 function linear_norm_g(genotype::Array{Float64,1}, env::Array{Float64,1}, σ::Float64=0.1)
     out = zeros(1+length(genotype))
     out[1] = genotype ⋅ env + rand(Normal(0,σ))
-    copy!(out[2:end], genotype)
+    out[2:end] = genotype
 
     return out
 end

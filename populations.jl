@@ -68,7 +68,7 @@ end
 type Population
     size::Int64
     pheno_func::Function            # map genotype to phenotype
-    npheno::Int64                   # length of phenotype vector
+    npheno::Int64                   # number of phenotypes for each individual
     fit_func::Function              # map phenotype to fitness
     mut_func::Function              # mutate genotype
     members::Array{Individual,1}
@@ -156,7 +156,8 @@ end
 ### iterate through the lifecycle of the population once
 ### 1. fitness calculated
 ### 2. survival
-### 3. fertility 
+### 3. fertility
+### 4. update environmental state
 ###
 function next_gen(pop::Population)
     # save initial population state in "prev" vector
@@ -180,7 +181,6 @@ function next_gen(pop::Population)
             # individual dies and is replaced by random new born 
             pop.members[i].age = 0
             parent = rand(fertdist)
-            #pop.members[i].genotype = pop.mut_func(pop.members_prev[parent])::Array{Float64,1}
             pop.mut_func(pop.members[i], pop.members_prev[parent]) # offspring, parent
         end
     end
