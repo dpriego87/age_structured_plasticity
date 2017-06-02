@@ -58,172 +58,7 @@ function runSim(p, reps, burns, iters, verbose=true)
     return (mgeno, env)
 end
 
-function popLinearPlasticityFert(;n=100, s=[0.0], ve=0.01,
-                                 A=1.0, B=1.0, γ=2.0, γb=0.0, wmax=1.0,
-                                 venv=0.1, arθ=0.75, vmut=0.01)
-    nages = length(s)
-    stdenv = sqrt(venv)
-
-    function phenof(i::Individual, e)
-        copy!(i.phenotype, linear_norm_g(i.genotype[i.age*2+1:i.age*2+2], e, ve))
-    end
-
-    function fitf(i::Individual, e)
-        if i.age < nages
-            i.fitness[1] = s[i.age+1]
-        else
-            i.fitness[1] = 0.0
-        end
-        i.fitness[2] = gauss_purify_cost_linear_norm(i.phenotype, e, Float64[A, B], γ, γb, wmax)
-    end
-
-    function mutf(offspring::Individual, parent::Individual)
-        copy!(offspring.genotype,
-              parent.genotype + rand(Normal(0.0,vmut), size(parent.genotype)))
-    end
-
-    p = Population(# population size
-                   n,
-                   # genotype->phenotype map
-                   phenof, 3,
-                   # fitness function
-                   fitf,
-                   # mutation function
-                   mutf,
-                   # initial genotype function
-                   (i)->zeros(2*nages),
-                   (e::Array{Float64,1})->[1.0, autoregressive([e[2]],[arθ],stdenv)::Array{Float64,1}], # env update function
-                   [1.0, 0.0]); # initial env state
-
-    return p
-end
-
-function popLinearPlasticityFert1(;n=100, s=[0.0], ve=0.01,
-                                 A=1.0, B=1.0, γ=2.0, γb=0.0, wmax=1.0,
-                                 venv=0.1, arθ=0.75, vmut=0.01)
-    nages = length(s)
-    stdenv = sqrt(venv)
-
-    function phenof(i::Individual, e)
-        copy!(i.phenotype, linear_norm_g(i.genotype[i.age*2+1:i.age*2+2], e, ve))
-    end
-
-    function fitf(i::Individual, e)
-        if i.age < nages
-            i.fitness[1] = s[i.age+1]
-        else
-            i.fitness[1] = 0.0
-        end
-        i.fitness[2] = gauss_purify_cost_linear_norm(i.phenotype, e, [A, B], γ, γb, wmax)
-    end
-
-    function mutf(offspring::Individual, parent::Individual)
-        copy!(offspring.genotype,
-              parent.genotype + rand(Normal(0.0,vmut), size(parent.genotype)))
-    end
-
-    p = Population(# population size
-                   n,
-                   # genotype->phenotype map
-                   phenof, 3,
-                   # fitness function
-                   fitf,
-                   # mutation function
-                   mutf,
-                   # initial genotype function
-                   (i)->zeros(2*nages),
-                   (e)->[1.0; autoregressive([e[2]],[arθ],stdenv)], # env update function
-                   [1.0, 0.0]); # initial env state
-
-    return p
-end
-
-function popLinearPlasticityFert2(;n=100, s=[0.0], ve=0.01,
-                                 A=1.0, B=1.0, γ=2.0, γb=0.0, wmax=1.0,
-                                 venv=0.1, arθ=0.75, vmut=0.01)
-    nages = length(s)
-    stdenv = sqrt(venv)
-
-    function phenof(i::Individual, e::Array{Float64,1})
-        copy!(i.phenotype, linear_norm_g(i.genotype[i.age*2+1:i.age*2+2], e, ve))
-    end
-
-    function fitf(i::Individual, e::Array{Float64,1})
-        if i.age < nages
-            i.fitness[1] = s[i.age+1]
-        else
-            i.fitness[1] = 0.0
-        end
-        i.fitness[2] = gauss_purify_cost_linear_norm(i.phenotype, e, [A, B], γ, γb, wmax)
-    end
-
-    function envf(e::Array{Float64,1})
-        return [1.0; autoregressive([e[2]],[arθ],stdenv)]
-    end
-    
-    function mutf(offspring::Individual, parent::Individual)
-        copy!(offspring.genotype,
-              parent.genotype + rand(Normal(0.0,vmut), size(parent.genotype)))
-    end
-
-    p = Population(# population size
-                   n,
-                   # genotype->phenotype map
-                   phenof, 3,
-                   # fitness function
-                   fitf,
-                   # mutation function
-                   mutf,
-                   # initial genotype function
-                   (i)->zeros(2*nages),
-                   envf, # env update function
-                   [1.0, 0.0]); # initial env state
-
-    return p
-end
-
-function popLinearPlasticityFert3(;n::Int64=100, s::Array{Float64,1}=[0.0], ve::Float64=0.01,
-                                 A::Float64=1.0, B::Float64=1.0, γ::Float64=2.0, γb::Float64=0.0, wmax::Float64=1.0,
-                                 venv::Float64=0.1, arθ::Float64=0.75, vmut::Float64=0.01)
-    nages = length(s)
-    stdenv = sqrt(venv)
-
-    function phenof(i::Individual, e)
-        copy!(i.phenotype, linear_norm_g(i.genotype[i.age*2+1:i.age*2+2], e, ve))
-    end
-
-    function fitf(i::Individual, e)
-        if i.age < nages
-            i.fitness[1] = s[i.age+1]
-        else
-            i.fitness[1] = 0.0
-        end
-        i.fitness[2] = gauss_purify_cost_linear_norm(i.phenotype, e, [A, B], γ, γb, wmax)
-    end
-
-    function mutf(offspring::Individual, parent::Individual)
-        copy!(offspring.genotype,
-              parent.genotype + rand(Normal(0.0,vmut), size(parent.genotype)))
-    end
-
-    p = Population(# population size
-                   n,
-                   # genotype->phenotype map
-                   phenof, 3,
-                   # fitness function
-                   fitf,
-                   # mutation function
-                   mutf,
-                   # initial genotype function
-                   (i)->zeros(2*nages),
-                   (e)->[1.0; autoregressive([e[2]],[arθ],stdenv)], # env update function
-                   [1.0, 0.0]); # initial env state
-
-    return p
-end
-
-## now the fastest
-function popLinearPlasticityFert4(;n::Int64=100, s::Array{Float64,1}=[0.0], ve::Float64=0.01,
+function popLinearPlasticityFert(;n::Int64=100, s::Array{Float64,1}=[0.0], ve::Float64=0.01,
                                  A::Float64=1.0, B::Float64=1.0, γ::Float64=2.0, γb::Float64=0.0, wmax::Float64=1.0,
                                  venv::Float64=0.1, arθ::Float64=0.75, vmut::Float64=0.01)
     nages = length(s)
@@ -252,7 +87,7 @@ function popLinearPlasticityFert4(;n::Int64=100, s::Array{Float64,1}=[0.0], ve::
     function envf(e::Array{Float64,1})
         env = zeros(2)
         env[1] = 1.0
-        env[2] = autoregressive([e[2]], varθ,stdenv)[1]
+        env[2] = autoregressive([e[2]], varθ, stdenv)[1]
         return env
     end
 
@@ -272,68 +107,22 @@ function popLinearPlasticityFert4(;n::Int64=100, s::Array{Float64,1}=[0.0], ve::
     return p
 end
 
-function popLinearPlasticityFert5(;n::Int64=100, s::Array{Float64,1}=[0.0], ve::Float64=0.01,
+function popLinearPlasticitySurv(;n::Int64=100, s::Array{Float64,1}=[0.0], ve::Float64=0.01,
                                  A::Float64=1.0, B::Float64=1.0, γ::Float64=2.0, γb::Float64=0.0, wmax::Float64=1.0,
                                  venv::Float64=0.1, arθ::Float64=0.75, vmut::Float64=0.01)
     nages = length(s)
     stdenv = sqrt(venv)
-
-    function phenof(i::Individual, e::Array{Float64,1})
-        copy!(i.phenotype, linear_norm_g(i.genotype[i.age*2+1:i.age*2+2], e, ve))
-    end
-
-    function fitf(i::Individual, e::Array{Float64,1})
-        if i.age < nages
-            i.fitness[1] = s[i.age+1]
-        else
-            i.fitness[1] = 0.0
-        end
-        i.fitness[2] = gauss_purify_cost_linear_norm(i.phenotype, e, [A, B], γ, γb, wmax)
-    end
-
-    function mutf(offspring::Individual, parent::Individual)
-        copy!(offspring.genotype,
-              parent.genotype + rand(Normal(0.0,vmut), size(parent.genotype)))
-    end
-
-    function envf(e::Array{Float64,1})
-        env = zeros(2)
-        env[1] = 1.0
-        env[2] = autoregressive([e[2]],[arθ],stdenv)[1]
-        return env
-    end
-
-    p = Population(# population size
-                   n,
-                   # genotype->phenotype map
-                   phenof, 3,
-                   # fitness function
-                   fitf,
-                   # mutation function
-                   mutf,
-                   # initial genotype function
-                   (i)->zeros(2*nages),
-                   envf, # env update function
-                   [1.0, 0.0]); # initial env state
-
-    return p
-end
-
-
-function popLinearPlasticitySurv(;n=100, s=[0.0], ve=0.01,
-                                 A=1.0, B=1.0, γ=2.0, γb=0.0, wmax=1.0,
-                                 venv=0.1, arθ=0.75, vmut=0.01)
-    nages = length(s)
-    stdenv = sqrt(venv)
+    AB = [A, B]
+    varθ = [arθ]
     
-    function phenof(i::Individual, e)
+    function phenof(i::Individual, e::Array{Float64,1})
         copy!(i.phenotype, linear_norm_g(i.genotype[i.age*2+1:i.age*2+2], e, ve))
     end
 
     function fitf(i::Individual, e)
         if i.age < nages - 1
             i.fitness[1] = s[i.age+1] +
-            gauss_purify_cost_linear_norm(i.phenotype, e, [A, B], γ, γb, wmax)
+            gauss_purify_cost_linear_norm(i.phenotype, e, AB, γ, γb, wmax)
         else
             i.fitness[1] = 0.0
         end
@@ -345,6 +134,13 @@ function popLinearPlasticitySurv(;n=100, s=[0.0], ve=0.01,
               parent.genotype + rand(Normal(0.0,vmut), size(parent.genotype)))
     end
 
+    function envf(e::Array{Float64,1})
+        env = zeros(2)
+        env[1] = 1.0
+        env[2] = autoregressive([e[2]], varθ, stdenv)[1]
+        return env
+    end
+
     p = Population(# population size
                    n,
                    # genotype->phenotype map
@@ -355,7 +151,7 @@ function popLinearPlasticitySurv(;n=100, s=[0.0], ve=0.01,
                    mutf,
                    # initial genotype function
                    (i)->zeros(2*nages),
-                   (e)->[1.0; autoregressive([e[2]],[arθ],stdenv)], # env update function
+                   envf, # env update function
                    [1.0, 0.0]); # initial env state
 
     return p
