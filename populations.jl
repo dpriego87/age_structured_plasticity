@@ -103,7 +103,7 @@ end
 
 # update environmental state using previous state
 function update_env_state(pop::Population)
-    pop.env_state = pop.env_func(pop.env_state)::Array{Float64,1}
+    copy!(pop.env_state, pop.env_func(pop.env_state))
     nothing
 end
 
