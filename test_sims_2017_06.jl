@@ -1,7 +1,7 @@
 using PyPlot
 using JLD
 
-include("senescence.jl")
+#include("senescence.jl")
 
 function plotBoxPlot(vals, expect, xticklab, ycolor)
     gcf()[:set_size_inches](4,3)
@@ -17,6 +17,13 @@ function plotBoxPlot(vals, expect, xticklab, ycolor)
     ax[:set_ylim](-3.0,3.0)
     ax[:set_xlabel]("Age class")
     ax[:set_ylabel]("Genotypic value")
+end
+
+function landeSlope(A, B, γ, γb, venv, arθ)
+    # variance for autoregressive process of order one
+    v = venv / (1 - arθ^2)
+    # predicted slopes from Lande (2014, JEB)
+    return [A, B / (1 + γb / (γ * v))]
 end
 
 reps = 50
