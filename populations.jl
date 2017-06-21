@@ -122,7 +122,7 @@ end
 
 function mean_genotype(pop::Population)
     ngeno = length(pop.members[1].genotype)
-    pop_geno = Array(Float64, ngeno, pop.size)
+    pop_geno = Array{Float64}(ngeno, pop.size)
     
     for i=1:pop.size
         pop_geno[:,i] = pop.members[i].genotype
@@ -133,7 +133,7 @@ end
 
 function mean_phenotype(pop::Population)
     npheno = length(pop.members[1].phenotype)
-    pop_pheno = Array(Float64, npheno, pop.size)
+    pop_pheno = Array{Float64}(npheno, pop.size)
     
     for i=1:pop.size
         pop_pheno[:,i] = pop.members[i].phenotype
@@ -143,7 +143,7 @@ function mean_phenotype(pop::Population)
 end
 
 function age_distribution(pop::Population)
-    ages = Array(Float64, pop.size)
+    ages = Array{Float64}(pop.size)
 
     for i=1:pop.size
         ages[i] = pop.members[i].age
