@@ -185,22 +185,6 @@ function popLinearPlasticitySurv(params)
     return p
 end
 
-function plotBoxPlot(vals, expect, xticklab, ycolor)
-    gcf()[:set_size_inches](4,3)
-    ax = gca()
-    bp = boxplot(vals, sym="")
-    setp(bp["boxes"], color="black")
-    setp(bp["medians"], color=ycolor)
-    setp(bp["whiskers"], color="black", dashes=(3,3))
-    
-    plot(0:size(vals)[2]+1, fill(expect,size(vals)[2]+2), linestyle="--", dashes=(5,5), color=ycolor)
-    
-    ax[:set_xticklabels](xticklab)
-    ax[:set_ylim](-3.0,3.0)
-    ax[:set_xlabel]("Age class")
-    ax[:set_ylabel]("Genotypic value")
-end
-
 ## Tell ArgParse how to read Arrays from string arguments 
 function ArgParse.parse_item(::Type{Array{Float64,1}}, x::AbstractString)
     return Array{Float64,1}(eval(parse(x)))
