@@ -42,54 +42,6 @@ type SenesceParams
                       new(n, s, ve, A, B, γ, γb, wmax, venv, arθ, vmut, reps, burns, iters)
 end
 
-
-function runSim(p, params, verbose=true)
-    reps, burns, iters = (params.reps, params.burns, params.iters)
-    
-    ngeno = length(p.members[1].genotype)
-    nenv  = length(p.env_state)
-    mgeno = zeros((ngeno, reps*iters))
-    env   = zeros((nenv, reps*iters))
-
-    totalruns = burns+iters
-    iterblock = round(reps * totalruns / 100)
-    
-    for r = 1:reps
-        # reset genotypes
-        for i = 1:p.size
-            p.members[i].genotype = zeros(ngeno)
-        end
-
-        for j = 1:totalruns
-            next_gen(p)
-            # record after burn in
-            if j > burns
-                mgeno[:,(r-1)*iters+j-burns] = mean_genotype(p)
-                env[:,(r-1)*iters+j-burns]   = p.env_state
-            end
-            # print %done
-            if ((r-1)*totalruns+j) % iterblock == 0 && verbose == true
-                print(round(Int,100.*((r-1)*totalruns+j)/(totalruns*reps)), "% ")
-            end
-        end
-    end
-    println()
-
-    return (mgeno, env)
-end
-
-
-## Assume a linear reaction norm with no past time dependence where
-## eqn 2c in Lande (2014) becomes
-## z_t = a + e + b ε_t
-## Then the predicted evolved slope from eqn 6b is given below
-function landeSlope(A, B, γ, γb, venv, arθ)
-    # variance for autoregressive process of order one
-    v = venv / (1 - arθ^2)
-    # predicted slopes from Lande (2014, JEB)
-    return [A, B / (1 + γb / (γ * v))]
-end
-
 function popLinearPlasticityFert(params)
     nages = length(params.s)
     stdenv = sqrt(params.venv)
@@ -185,6 +137,43 @@ function popLinearPlasticitySurv(params)
     return p
 end
 
+
+function runSim(p, params, verbose=true)
+    reps, burns, iters = (params.reps, params.burns, params.iters)
+    
+    ngeno = length(p.members[1].genotype)
+    nenv  = length(p.env_state)
+    mgeno = zeros((ngeno, reps*iters))
+    env   = zeros((nenv, reps*iters))
+
+    totalruns = burns+iters
+    iterblock = round(reps * totalruns / 100)
+    
+    for r = 1:reps
+        # reset genotypes
+        for i = 1:p.size
+            p.members[i].genotype = zeros(ngeno)
+        end
+
+        for j = 1:totalruns
+            next_gen(p)
+            # record after burn in
+            if j > burns
+                mgeno[:,(r-1)*iters+j-burns] = mean_genotype(p)
+                env[:,(r-1)*iters+j-burns]   = p.env_state
+            end
+            # print %done
+            if ((r-1)*totalruns+j) % iterblock == 0 && verbose == true
+                print(round(Int,100.*((r-1)*totalruns+j)/(totalruns*reps)), "% ")
+            end
+        end
+    end
+    println()
+
+    return (mgeno, env)
+end
+
+
 ## Tell ArgParse how to read Arrays from string arguments 
 function ArgParse.parse_item(::Type{Array{Float64,1}}, x::AbstractString)
     return Array{Float64,1}(eval(parse(x)))
@@ -223,8 +212,8 @@ function main()
     pop = popLinearPlasticityFert(params)
     (mg, env) = runSim(pop, params)
 
-    # save results (appending .jl if necessary)
-    file = ismatch(r"\.jl", parsed_args["file"]) ? parsed_args["file"] : parsed_args["file"]*".jl"
+    # save results (appending .jld if necessary)
+    file = ismatch(r"\.jld", parsed_args["file"]) ? parsed_args["file"] : parsed_args["file"]*".jld"
     save(file, "params", params, "mg", mg, "env", env)
 
 end

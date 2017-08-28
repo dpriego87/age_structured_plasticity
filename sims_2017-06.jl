@@ -27,11 +27,13 @@ for p in 1:nsets
     filebase = basename * numstr
 
     # add parameter values as command line options
-    simstr *= join( map( (x) -> "--" * x[1] * "=\"" * string(x[2]) * "\"", zip(pars, parsets[p])), " ")
-    simstr *= " --file=" * filebase * ".jl"
+    simstr *= join(map( (x) -> "--" * x[1] * "=\"" * string(x[2]) * "\"", zip(pars, parsets[p])), " ")
+    simstr *= " --file=" * filebase * ".jld"
 
-    cmdstr = "sbatch --job-name='plasticity_aging_" * numstr *
-        "' --output=" * basename * ".out --wrap='" * simstr * "'"
+    cmdstr = "--job-name='plasticity_aging_" * numstr * "' " *
+        "--output=" * basename * ".out" *
+        " --wrap='" * simstr * "'"
 
-    println(cmdstr)
+    run(`sbatch julia senescence.jl $cmdstr`)
+    
 end

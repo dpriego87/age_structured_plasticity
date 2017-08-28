@@ -19,6 +19,10 @@ function plotBoxPlot(vals, expect, xticklab, ycolor)
     ax[:set_ylabel]("Genotypic value")
 end
 
+## Assume a linear reaction norm with no past time dependence where
+## eqn 2c in Lande (2014) becomes
+## z_t = a + e + b ε_t
+## Then the predicted evolved slope from eqn 6b is given below
 function landeSlope(A, B, γ, γb, venv, arθ)
     # variance for autoregressive process of order one
     v = venv / (1 - arθ^2)
