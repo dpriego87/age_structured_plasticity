@@ -43,22 +43,27 @@ type SenesceParams
 end
 
 function popLinearPlasticityFert(params)
+    # nages is number of stages with positive survival, i.e.: w/o terminal age class
     nages = length(params.s)
     stdenv = sqrt(params.venv)
     AB = [params.A, params.B]
     varθ = [params.arθ]
 
     function phenof(i::Individual, e::Array{Float64,1})
-        copy!(i.phenotype, linear_norm_g(i.genotype[i.age*2+1:i.age*2+2], e, params.ve))
+            @views copy!(i.phenotype, linear_norm(i.genotype[i.age*2+1:i.age*2+2], e, params.ve))
     end
 
     function fitf(i::Individual, e::Array{Float64,1})
         if i.age < nages
             i.fitness[1] = params.s[i.age+1]
         else
+            # terminal age class always dies
             i.fitness[1] = 0.0
         end
-        i.fitness[2] = gauss_purify_cost_linear_norm(i.phenotype, e, AB, params.γ, params.γb, params.wmax)
+        # all ages including terminal age class have fertility effects
+        i.fitness[2] = @views gauss_purify_cost_linear_norm(i.genotype[i.age*2+1:i.age*2+2],
+                                                            i.phenotype,
+                                                            e, AB, params.γ, params.γb, params.wmax)
     end
 
     function mutf(offspring::Individual, parent::Individual)
@@ -76,13 +81,13 @@ function popLinearPlasticityFert(params)
     p = Population(# population size
                    params.n,
                    # genotype->phenotype map
-                   phenof, 3,
+                   phenof, 1,
                    # fitness function
                    fitf,
                    # mutation function
                    mutf,
-                   # initial genotype function
-                   (i)->zeros(2*nages),
+                   # initial genotype function: fertility effects includes terminal age class
+                   (i)->zeros(2*(nages+1)),
                    envf, # env update function
                    [1.0, 0.0]); # initial env state
 
@@ -90,22 +95,29 @@ function popLinearPlasticityFert(params)
 end
 
 function popLinearPlasticitySurv(params)
+    # nages is number of stages with positive survival, i.e.: w/o terminal age class    
     nages = length(params.s)
     stdenv = sqrt(params.venv)
     AB = [params.A, params.B]
     varθ = [params.arθ]
     
     function phenof(i::Individual, e::Array{Float64,1})
-        copy!(i.phenotype, linear_norm_g(i.genotype[i.age*2+1:i.age*2+2], e, params.ve))
+        if i.age < nages
+            @views copy!(i.phenotype, linear_norm(i.genotype[i.age*2+1:i.age*2+2], e, params.ve))
+        end
     end
 
     function fitf(i::Individual, e)
-        if i.age < nages - 1
+        if i.age < nages
             i.fitness[1] = params.s[i.age+1] +
-            gauss_purify_cost_linear_norm(i.phenotype, e, AB, params.γ, params.γb, params.wmax)
+                @views gauss_purify_cost_linear_norm(i.genotype[i.age*2+1:i.age*2+2],
+                                                     i.phenotype,
+                                                     e, AB, params.γ, params.γb, params.wmax)
         else
+            # terminal age class always dies
             i.fitness[1] = 0.0
         end
+        # all ages including terminal age class have fertility
         i.fitness[2] = 1.0
     end
 
@@ -124,7 +136,7 @@ function popLinearPlasticitySurv(params)
     p = Population(# population size
                    params.n,
                    # genotype->phenotype map
-                   phenof, 3,
+                   phenof, 1,
                    # fitness function
                    fitf,
                    # mutation function
@@ -207,8 +219,6 @@ function main()
 
     # create parameter object, pop, and run sim
     params = SenesceParams(;sim_params...)
-    # println(params)
-    # exit()
     pop = popLinearPlasticityFert(params)
     (mg, env) = runSim(pop, params)
 

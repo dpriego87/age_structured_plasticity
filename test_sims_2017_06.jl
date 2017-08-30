@@ -34,18 +34,26 @@ end
 using BenchmarkTools
 
 srand(3141);
-println("v1")
-p = popLinearPlasticityFert(n=500, s=[0.9, 0.9, 0.1, 0.0], ve=0.01,
+pars = SenesceParams(n=500, s=[0.9, 0.9, 0.1, 0.1], ve=0.01,
                             A=1.0, B=1.0, γ=2.0, γb=0.1, wmax=3.0,
-                            venv=0.1, arθ=0.75, vmut=0.01);
-@benchmark (mg, env) = runSim(p, 1, 1000, 0, false)
+                            venv=0.1, arθ=0.75, vmut=0.01, reps=1, burns=1000, iters=1000)
+p = popLinearPlasticityFert(pars);
+@time (mg, env) = runSim(p, pars)
+
+srand(3141);
+pars = SenesceParams(n=500, s=[0.9, 0.9, 0.1, 0.1], ve=0.01,
+                            A=1.0, B=1.0, γ=2.0, γb=0.1, wmax=3.0,
+                            venv=0.1, arθ=0.75, vmut=0.01, reps=1, burns=1000, iters=1000)
+p = popLinearPlasticityFert(pars);
+@benchmark (mg, env) = runSim(p, pars)
 
 ## profiling
 
 srand(3141);
-p = popLinearPlasticityFert(n=500, s=[0.9, 0.9, 0.1, 0.0], ve=0.01,
+pars = SenesceParams(n=500, s=[0.9, 0.9, 0.1, 0.0], ve=0.01,
                             A=1.0, B=1.0, γ=2.0, γb=0.1, wmax=3.0,
-                            venv=0.1, arθ=0.75, vmut=0.01);
+                            venv=0.1, arθ=0.75, vmut=0.01)
+p = popLinearPlasticityFert(pars);
 @profile (mg, env) = runSim(p, 1, 20000, 0);
 
 srand(3141);
@@ -55,29 +63,30 @@ p = popLinearPlasticitySurv(n=500, s=[0.9, 0.9, 0.1, 0.0], ve=0.01,
 @profile (mg, env) = runSim(p, 1, 20000, 0);
 
 ### burn in length
-run(`julia senescence.jl --n=500 --s="[0.9, 0.7, 0.4, 0.1, 0.0]" --ve=0.01 --A=2.0 --B=2.0 --γ=0.05 --γb=0 --wmax=1.0 --venv=1 --arθ=0.75 --vmut=0.1 --reps=10 --burns=100 --iters=100 --file=test1.jld`);
-run(`julia senescence.jl --n=500 --s="[0.9, 0.7, 0.4, 0.1, 0.0]" --ve=0.01 --A=2.0 --B=2.0 --γ=0.05 --γb=0 --wmax=1.0 --venv=1 --arθ=0.75 --vmut=0.1 --reps=10 --burns=500 --iters=100 --file=test2.jld`);
-run(`julia senescence.jl --n=500 --s="[0.9, 0.7, 0.4, 0.1, 0.0]" --ve=0.01 --A=2.0 --B=2.0 --γ=0.05 --γb=0 --wmax=1.0 --venv=1 --arθ=0.75 --vmut=0.1 --reps=10 --burns=1000 --iters=100 --file=test3.jld`);
-run(`julia senescence.jl --n=500 --s="[0.9, 0.7, 0.4, 0.1, 0.0]" --ve=0.01 --A=2.0 --B=2.0 --γ=0.05 --γb=0 --wmax=1.0 --venv=1 --arθ=0.75 --vmut=0.1 --reps=10 --burns=5000 --iters=100 --file=test4.jld`);
+run(`julia senescence.jl --n=500 --s="[0.9, 0.7, 0.4, 0.1]" --ve=0.01 --A=2.0 --B=2.0 --γ=0.05 --γb=0 --wmax=1.0 --venv=1 --arθ=0.75 --vmut=0.1 --reps=10 --burns=100 --iters=100 --file=test1.jld`);
+run(`julia senescence.jl --n=500 --s="[0.9, 0.7, 0.4, 0.1]" --ve=0.01 --A=2.0 --B=2.0 --γ=0.05 --γb=0 --wmax=1.0 --venv=1 --arθ=0.75 --vmut=0.1 --reps=10 --burns=500 --iters=100 --file=test2.jld`);
+run(`julia senescence.jl --n=500 --s="[0.9, 0.7, 0.4, 0.1]" --ve=0.01 --A=2.0 --B=2.0 --γ=0.05 --γb=0 --wmax=1.0 --venv=1 --arθ=0.75 --vmut=0.1 --reps=10 --burns=1000 --iters=100 --file=test3.jld`);
+run(`julia senescence.jl --n=500 --s="[0.9, 0.7, 0.4, 0.1]" --ve=0.01 --A=2.0 --B=2.0 --γ=0.05 --γb=0 --wmax=1.0 --venv=1 --arθ=0.75 --vmut=0.1 --reps=10 --burns=5000 --iters=100 --file=test4.jld`);
 
+nages = 4
 clf()
 (mg, env, params) = load("test1.jld", "mg", "env", "params");
 subplot(421)
-plotBoxPlot(mg[1:2:10,:]', landeSlope(params.A, params.B, params.γ, params.γb, params.venv, params.arθ)[1], string.(range(0,10)), "black")
+plotBoxPlot(mg[1:2:2*nages,:]', landeSlope(params.A, params.B, params.γ, params.γb, params.venv, params.arθ)[1], string.(range(0,10)), "black")
 subplot(422)
-plotBoxPlot(mg[2:2:10,:]', landeSlope(params.A, params.B, params.γ, params.γb, params.venv, params.arθ)[2], string.(range(0,10)), "black")
+plotBoxPlot(mg[2:2:2*nages,:]', landeSlope(params.A, params.B, params.γ, params.γb, params.venv, params.arθ)[2], string.(range(0,10)), "black")
 (mg, env, params) = load("test2.jld", "mg", "env", "params");
 subplot(423)
-plotBoxPlot(mg[1:2:10,:]', landeSlope(params.A, params.B, params.γ, params.γb, params.venv, params.arθ)[1], string.(range(0,10)), "black")
+plotBoxPlot(mg[1:2:2*nages,:]', landeSlope(params.A, params.B, params.γ, params.γb, params.venv, params.arθ)[1], string.(range(0,10)), "black")
 subplot(424)
-plotBoxPlot(mg[2:2:10,:]', landeSlope(params.A, params.B, params.γ, params.γb, params.venv, params.arθ)[2], string.(range(0,10)), "black")
+plotBoxPlot(mg[2:2:2*nages,:]', landeSlope(params.A, params.B, params.γ, params.γb, params.venv, params.arθ)[2], string.(range(0,10)), "black")
 (mg, env, params) = load("test3.jld", "mg", "env", "params");
 subplot(425)
-plotBoxPlot(mg[1:2:10,:]', landeSlope(params.A, params.B, params.γ, params.γb, params.venv, params.arθ)[1], string.(range(0,10)), "black")
+plotBoxPlot(mg[1:2:2*nages,:]', landeSlope(params.A, params.B, params.γ, params.γb, params.venv, params.arθ)[1], string.(range(0,10)), "black")
 subplot(426)
-plotBoxPlot(mg[2:2:10,:]', landeSlope(params.A, params.B, params.γ, params.γb, params.venv, params.arθ)[2], string.(range(0,10)), "black")
+plotBoxPlot(mg[2:2:2*nages,:]', landeSlope(params.A, params.B, params.γ, params.γb, params.venv, params.arθ)[2], string.(range(0,10)), "black")
 (mg, env, params) = load("test4.jld", "mg", "env", "params");
 subplot(427)
-plotBoxPlot(mg[1:2:10,:]', landeSlope(params.A, params.B, params.γ, params.γb, params.venv, params.arθ)[1], string.(range(0,10)), "black")
+plotBoxPlot(mg[1:2:2*nages,:]', landeSlope(params.A, params.B, params.γ, params.γb, params.venv, params.arθ)[1], string.(range(0,10)), "black")
 subplot(428)
-plotBoxPlot(mg[2:2:10,:]', landeSlope(params.A, params.B, params.γ, params.γb, params.venv, params.arθ)[2], string.(range(0,10)), "black")
+plotBoxPlot(mg[2:2:2*nages,:]', landeSlope(params.A, params.B, params.γ, params.γb, params.venv, params.arθ)[2], string.(range(0,10)), "black")
