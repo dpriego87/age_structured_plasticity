@@ -68,7 +68,7 @@ run(`julia senescence.jl --n=500 --s="[0.9, 0.7, 0.4, 0.1]" --ve=0.01 --A=2.0 --
 run(`julia senescence.jl --n=500 --s="[0.9, 0.7, 0.4, 0.1]" --ve=0.01 --A=2.0 --B=2.0 --γ=0.05 --γb=0 --wmax=1.0 --venv=1 --arθ=0.75 --vmut=0.1 --reps=10 --burns=1000 --iters=100 --file=test3.jld`);
 run(`julia senescence.jl --n=500 --s="[0.9, 0.7, 0.4, 0.1]" --ve=0.01 --A=2.0 --B=2.0 --γ=0.05 --γb=0 --wmax=1.0 --venv=1 --arθ=0.75 --vmut=0.1 --reps=10 --burns=5000 --iters=100 --file=test4.jld`);
 
-nages = 4
+nages = 5
 clf()
 (mg, env, params) = load("test1.jld", "mg", "env", "params");
 subplot(421)

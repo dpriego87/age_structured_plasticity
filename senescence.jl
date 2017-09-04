@@ -21,6 +21,8 @@ using populations
 type SenesceParams
     n::Int64
     s::Array{Float64,1}
+    f::Array{Float64,1}
+    evolsf::Array{Bool,1}
     ve::Float64
     A::Float64
     B::Float64
@@ -35,11 +37,84 @@ type SenesceParams
     iters::Int64
 
     # Constructor. Takes keyword arguments to make it easier to call with command line arguments
-    SenesceParams(;n::Int64=100, s::Array{Float64,1}=[0.0], ve::Float64=0.01,
-                  A::Float64=1.0, B::Float64=1.0, γ::Float64=2.0, γb::Float64=0.0, wmax::Float64=1.0,
-                  venv::Float64=0.1, arθ::Float64=0.75, vmut::Float64=0.01,
+    SenesceParams(;n::Int64=100, s::Array{Float64,1}=[0.0], f::Array{Float64,1}=[1.0, 1.0],
+                  evolsf::Array{Bool,1}=[false,true],
+                  ve::Float64=0.01,
+                  A::Float64=1.0, B::Float64=1.0, γ::Float64=2.0, γb::Float64=0.0,
+                  wmax::Float64=1.0, venv::Float64=0.1, arθ::Float64=0.75, vmut::Float64=0.01,
                   reps::Int64=10, burns::Int64=5000, iters::Int64=1000) =
-                      new(n, s, ve, A, B, γ, γb, wmax, venv, arθ, vmut, reps, burns, iters)
+                      length(f) != length(s) + 1 &&
+                      (evolsf[1] || evolsf[2]) && !(evolsf[1] && evolsf[2]) ?
+                      error("invalid parameter construction") :
+                      new(n, s, f, evolsf, ve, A, B, γ, γb, wmax, venv, arθ, vmut, reps, burns, iters)
+end
+
+function popLinearPlasticity(params)
+    # nages is number of stages with positive survival, i.e.: w/o terminal age class
+    nages = length(params.s)
+    # number of genes, which is either the twice number of surivival or fertility parameters
+    # (only one element of params.evolsf should be true)
+    ngenes = 2 * (params.evolsf[1] * length(params.s) + params.evolsf[2] * length(params.f))
+    stdenv = sqrt(params.venv)
+    AB = [params.A, params.B]
+    varθ = [params.arθ]
+
+    
+    function phenof(i::Individual, e::Array{Float64,1})
+            @views copy!(i.phenotype, linear_norm(i.genotype[i.age*2+1:i.age*2+2], e, params.ve))
+    end
+
+    function fitf(i::Individual, e::Array{Float64,1})
+        if i.age < nages
+            i.fitness[1] = params.s[i.age+1]
+            if params.evolsf[1]
+                # evolve baseline survival
+                i.fitness[1] +=
+                    @views gauss_purify_cost_linear_norm(i.genotype[i.age*2+1:i.age*2+2],
+                                                         i.phenotype,
+                                                         e, AB, params.γ, params.γb, params.wmax)
+            end
+        else
+            # terminal age class always dies
+            i.fitness[1] = 0.0
+        end
+        # all ages including terminal age class can have positive fertility
+        i.fitness[2] = params.f[i.age+1]
+        if params.evolsf[2]
+            # evolve baseline fertility
+            i.fitness[2] +=
+                @views gauss_purify_cost_linear_norm(i.genotype[i.age*2+1:i.age*2+2],
+                                                     i.phenotype,
+                                                     e, AB, params.γ, params.γb, params.wmax)
+        end
+    end
+
+    function mutf(offspring::Individual, parent::Individual)
+        copy!(offspring.genotype,
+              parent.genotype + rand(Normal(0.0,params.vmut), size(parent.genotype)))
+    end
+
+    function envf(e::Array{Float64,1})
+        env = zeros(2)
+        env[1] = 1.0
+        env[2] = autoregressive([e[2]], varθ, stdenv)[1]
+        return env
+    end
+
+    p = Population(# population size
+                   params.n,
+                   # genotype->phenotype map
+                   phenof, 1,
+                   # fitness function
+                   fitf,
+                   # mutation function
+                   mutf,
+                   # initial genotype function: fertility effects includes terminal age class
+                   (i)->zeros(ngenes),
+                   envf, # env update function
+                   [1.0, 0.0]); # initial env state
+
+    return p
 end
 
 function popLinearPlasticityFert(params)
@@ -61,9 +136,10 @@ function popLinearPlasticityFert(params)
             i.fitness[1] = 0.0
         end
         # all ages including terminal age class have fertility effects
-        i.fitness[2] = @views gauss_purify_cost_linear_norm(i.genotype[i.age*2+1:i.age*2+2],
-                                                            i.phenotype,
-                                                            e, AB, params.γ, params.γb, params.wmax)
+        i.fitness[2] = params.f[i.age+1] +
+            @views gauss_purify_cost_linear_norm(i.genotype[i.age*2+1:i.age*2+2],
+                                                 i.phenotype,
+                                                 e, AB, params.γ, params.γb, params.wmax)
     end
 
     function mutf(offspring::Individual, parent::Individual)
@@ -190,21 +266,23 @@ end
 function ArgParse.parse_item(::Type{Array{Float64,1}}, x::AbstractString)
     return Array{Float64,1}(eval(parse(x)))
 end
+function ArgParse.parse_item(::Type{Array{Bool,1}}, x::AbstractString)
+    return Array{Bool,1}(eval(parse(x)))
+end
 
 function main()
 
     s = ArgParseSettings()
 
-    pars = ["n", "s", "ve", "A", "B", "γ", "γb",
-            "wmax", "venv", "arθ", "vmut",
-            "reps", "burns", "iters", "file"]
-    parstype = [Int64, Array{Float64,1}, Float64, Float64, Float64, Float64, Float64,
-                Float64, Float64, Float64, Float64,
-                Int64, Int64, Int64, String]
+    # gather parameters from SenesceParams object automatically and add file option
+    pars = [["--"*String(field) for field in fieldnames(SenesceParams)];
+            ["--file"]]
+    parstype = [[fieldtype(SenesceParams,field) for field in fieldnames(SenesceParams)];
+                String]
     
     args = Array{Any,1}()
     for i in 1:length(pars)
-        push!(args, "--"*pars[i])
+        push!(args, pars[i])
         push!(args, Dict(:arg_type => parstype[i], :required => true))
     end
     add_arg_table(s, args...)
@@ -219,7 +297,7 @@ function main()
 
     # create parameter object, pop, and run sim
     params = SenesceParams(;sim_params...)
-    pop = popLinearPlasticityFert(params)
+    pop = popLinearPlasticity(params)
     (mg, env) = runSim(pop, params)
 
     # save results (appending .jld if necessary)
