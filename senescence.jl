@@ -8,8 +8,6 @@ include("phenotype.jl")
 include("fitness.jl")
 
 using Distributions
-using ArgParse
-using JLD
 using populations
 
 ##
@@ -117,115 +115,6 @@ function popLinearPlasticity(params)
     return p
 end
 
-function popLinearPlasticityFert(params)
-    # nages is number of stages with positive survival, i.e.: w/o terminal age class
-    nages = length(params.s)
-    stdenv = sqrt(params.venv)
-    AB = [params.A, params.B]
-    varθ = [params.arθ]
-
-    function phenof(i::Individual, e::Array{Float64,1})
-            @views copy!(i.phenotype, linear_norm(i.genotype[i.age*2+1:i.age*2+2], e, params.ve))
-    end
-
-    function fitf(i::Individual, e::Array{Float64,1})
-        if i.age < nages
-            i.fitness[1] = params.s[i.age+1]
-        else
-            # terminal age class always dies
-            i.fitness[1] = 0.0
-        end
-        # all ages including terminal age class have fertility effects
-        i.fitness[2] = params.f[i.age+1] +
-            @views gauss_purify_cost_linear_norm(i.genotype[i.age*2+1:i.age*2+2],
-                                                 i.phenotype,
-                                                 e, AB, params.γ, params.γb, params.wmax)
-    end
-
-    function mutf(offspring::Individual, parent::Individual)
-        copy!(offspring.genotype,
-              parent.genotype + rand(Normal(0.0,params.vmut), size(parent.genotype)))
-    end
-
-    function envf(e::Array{Float64,1})
-        env = zeros(2)
-        env[1] = 1.0
-        env[2] = autoregressive([e[2]], varθ, stdenv)[1]
-        return env
-    end
-
-    p = Population(# population size
-                   params.n,
-                   # genotype->phenotype map
-                   phenof, 1,
-                   # fitness function
-                   fitf,
-                   # mutation function
-                   mutf,
-                   # initial genotype function: fertility effects includes terminal age class
-                   (i)->zeros(2*(nages+1)),
-                   envf, # env update function
-                   [1.0, 0.0]); # initial env state
-
-    return p
-end
-
-function popLinearPlasticitySurv(params)
-    # nages is number of stages with positive survival, i.e.: w/o terminal age class    
-    nages = length(params.s)
-    stdenv = sqrt(params.venv)
-    AB = [params.A, params.B]
-    varθ = [params.arθ]
-    
-    function phenof(i::Individual, e::Array{Float64,1})
-        if i.age < nages
-            @views copy!(i.phenotype, linear_norm(i.genotype[i.age*2+1:i.age*2+2], e, params.ve))
-        end
-    end
-
-    function fitf(i::Individual, e)
-        if i.age < nages
-            i.fitness[1] = params.s[i.age+1] +
-                @views gauss_purify_cost_linear_norm(i.genotype[i.age*2+1:i.age*2+2],
-                                                     i.phenotype,
-                                                     e, AB, params.γ, params.γb, params.wmax)
-        else
-            # terminal age class always dies
-            i.fitness[1] = 0.0
-        end
-        # all ages including terminal age class have fertility
-        i.fitness[2] = 1.0
-    end
-
-    function mutf(offspring::Individual, parent::Individual)
-        copy!(offspring.genotype,
-              parent.genotype + rand(Normal(0.0,params.vmut), size(parent.genotype)))
-    end
-
-    function envf(e::Array{Float64,1})
-        env = zeros(2)
-        env[1] = 1.0
-        env[2] = autoregressive([e[2]], varθ, stdenv)[1]
-        return env
-    end
-
-    p = Population(# population size
-                   params.n,
-                   # genotype->phenotype map
-                   phenof, 1,
-                   # fitness function
-                   fitf,
-                   # mutation function
-                   mutf,
-                   # initial genotype function
-                   (i)->zeros(2*nages),
-                   envf, # env update function
-                   [1.0, 0.0]); # initial env state
-
-    return p
-end
-
-
 function runSim(p, params, verbose=true)
     reps, burns, iters = (params.reps, params.burns, params.iters)
     
@@ -260,50 +149,3 @@ function runSim(p, params, verbose=true)
 
     return (mgeno, env)
 end
-
-
-## Tell ArgParse how to read Arrays from string arguments 
-function ArgParse.parse_item(::Type{Array{Float64,1}}, x::AbstractString)
-    return Array{Float64,1}(eval(parse(x)))
-end
-function ArgParse.parse_item(::Type{Array{Bool,1}}, x::AbstractString)
-    return Array{Bool,1}(eval(parse(x)))
-end
-
-function main()
-
-    s = ArgParseSettings()
-
-    # gather parameters from SenesceParams object automatically and add file option
-    pars = [["--"*String(field) for field in fieldnames(SenesceParams)];
-            ["--file"]]
-    parstype = [[fieldtype(SenesceParams,field) for field in fieldnames(SenesceParams)];
-                String]
-    
-    args = Array{Any,1}()
-    for i in 1:length(pars)
-        push!(args, pars[i])
-        push!(args, Dict(:arg_type => parstype[i], :required => true))
-    end
-    add_arg_table(s, args...)
-    parsed_args = parse_args(s)
-    sim_args = copy(parsed_args)
-    delete!(sim_args, "file")
-
-    sim_params = Dict()
-    for (arg, val) in sim_args
-        sim_params[parse(arg)] = val
-    end
-
-    # create parameter object, pop, and run sim
-    params = SenesceParams(;sim_params...)
-    pop = popLinearPlasticity(params)
-    (mg, env) = runSim(pop, params)
-
-    # save results (appending .jld if necessary)
-    file = ismatch(r"\.jld", parsed_args["file"]) ? parsed_args["file"] : parsed_args["file"]*".jld"
-    save(file, "params", params, "mg", mg, "env", env)
-
-end
-
-main()
