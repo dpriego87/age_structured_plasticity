@@ -54,12 +54,15 @@ function popLinearPlasticity(params)
     # (only one element of params.evolsf should be true)
     ngenes = 2 * (params.evolsf[1] * length(params.s) + params.evolsf[2] * length(params.f))
     stdenv = sqrt(params.venv)
+    stde = sqrt(params.ve)
+    smut = sqrt(params.vmut)
     AB = [params.A, params.B]
-    varθ = [params.arθ]
-
+    arθ = [params.arθ]
     
     function phenof(i::Individual, e::Array{Float64,1})
-            @views copy!(i.phenotype, linear_norm(i.genotype[i.age*2+1:i.age*2+2], e, params.ve))
+        if 2 * i.age < ngenes
+            @views copy!(i.phenotype, linear_norm(i.genotype[i.age*2+1:i.age*2+2], e, stde))
+        end
     end
 
     function fitf(i::Individual, e::Array{Float64,1})
@@ -89,13 +92,13 @@ function popLinearPlasticity(params)
 
     function mutf(offspring::Individual, parent::Individual)
         copy!(offspring.genotype,
-              parent.genotype + rand(Normal(0.0,params.vmut), size(parent.genotype)))
+              parent.genotype + rand(Normal(0.0,smut), size(parent.genotype)))
     end
 
     function envf(e::Array{Float64,1})
         env = zeros(2)
         env[1] = 1.0
-        env[2] = autoregressive([e[2]], varθ, stdenv)[1]
+        env[2] = autoregressive([e[2]], arθ, stdenv)[1]
         return env
     end
 

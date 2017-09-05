@@ -1,7 +1,7 @@
 using PyPlot
 using JLD
 
-#include("senescence.jl")
+include("senescence.jl")
 
 function plotBoxPlot(vals, expect, xticklab, ycolor)
     gcf()[:set_size_inches](4,3)
@@ -29,6 +29,23 @@ function landeSlope(A, B, γ, γb, venv, arθ)
     # predicted slopes from Lande (2014, JEB)
     return [A, B / (1 + γb / (γ * v))]
 end
+
+function eigSens(params)
+    nages = length(params.f)
+    # construct Leslie matrix
+    projm = zeros(nages, nages)
+    projm[1,:] = params.f
+    projm += diagm(params.s, -1)
+
+    # get right (w) and left (v) eigenvectors
+    (e, w) = eig(projm)
+    (e, v) = eig(projm')
+    # find max absolute eigenvalue
+    (absemax, imax) = findmax(abs.(e))
+    println(e[imax])
+    return v[:,imax] * w[:,imax]' / (w[:,imax]' * v[:,imax])
+end
+
 
 ## timing
 using BenchmarkTools
@@ -63,12 +80,12 @@ p = popLinearPlasticitySurv(n=500, s=[0.9, 0.9, 0.1, 0.0], ve=0.01,
 @profile (mg, env) = runSim(p, 1, 20000, 0);
 
 ### burn in length
-run(`julia senescence.jl --n=500 --s="[0.9, 0.7, 0.4, 0.1]" --f="[1.0, 1.0, 1.0, 1.0, 1.0]" --evolsf="[false,true]" --ve=0.01 --A=2.0 --B=2.0 --γ=0.05 --γb=0 --wmax=1.0 --venv=1 --arθ=0.75 --vmut=0.1 --reps=10 --burns=100 --iters=100 --file=test1.jld`);
-run(`julia senescence.jl --n=500 --s="[0.9, 0.7, 0.4, 0.1]" --f="[1.0, 1.0, 1.0, 1.0, 1.0]" --evolsf="[false,true]" --ve=0.01 --A=2.0 --B=2.0 --γ=0.05 --γb=0 --wmax=1.0 --venv=1 --arθ=0.75 --vmut=0.1 --reps=10 --burns=500 --iters=100 --file=test2.jld`);
-run(`julia senescence.jl --n=500 --s="[0.9, 0.7, 0.4, 0.1]" --f="[1.0, 1.0, 1.0, 1.0, 1.0]" --evolsf="[false,true]" --ve=0.01 --A=2.0 --B=2.0 --γ=0.05 --γb=0 --wmax=1.0 --venv=1 --arθ=0.75 --vmut=0.1 --reps=10 --burns=1000 --iters=100 --file=test3.jld`);
-run(`julia senescence.jl --n=500 --s="[0.9, 0.7, 0.4, 0.1]" --f="[1.0, 1.0, 1.0, 1.0, 1.0]" --evolsf="[false,true]" --ve=0.01 --A=2.0 --B=2.0 --γ=0.05 --γb=0 --wmax=1.0 --venv=1 --arθ=0.75 --vmut=0.1 --reps=10 --burns=5000 --iters=100 --file=test4.jld`);
+run(`julia senescence_sim.jl --n=500 --s="[0.1, 0.4, 0.7, 0.9]" --f="[1.0, 1.0, 1.0, 1.0, 1.0]" --evolsf="[true,false]" --ve=0.01 --A=2.0 --B=2.0 --γ=0.1 --γb=0 --wmax=1.0 --venv=1 --arθ=0.75 --vmut=0.1 --reps=10 --burns=100 --iters=100 --file=test1.jld`);
+run(`julia senescence_sim.jl --n=500 --s="[0.1, 0.4, 0.7, 0.9]" --f="[1.0, 1.0, 1.0, 1.0, 1.0]" --evolsf="[true,false]" --ve=0.01 --A=2.0 --B=2.0 --γ=0.1 --γb=0 --wmax=1.0 --venv=1 --arθ=0.75 --vmut=0.1 --reps=10 --burns=500 --iters=100 --file=test2.jld`);
+run(`julia senescence_sim.jl --n=500 --s="[0.1, 0.4, 0.7, 0.9]" --f="[1.0, 1.0, 1.0, 1.0, 1.0]" --evolsf="[true,false]" --ve=0.01 --A=2.0 --B=2.0 --γ=0.1 --γb=0 --wmax=1.0 --venv=1 --arθ=0.75 --vmut=0.1 --reps=10 --burns=1000 --iters=100 --file=test3.jld`);
+run(`julia senescence_sim.jl --n=500 --s="[0.1, 0.4, 0.7, 0.9]" --f="[1.0, 1.0, 1.0, 1.0, 1.0]" --evolsf="[true,false]" --ve=0.01 --A=2.0 --B=2.0 --γ=0.1 --γb=0 --wmax=1.0 --venv=1 --arθ=0.75 --vmut=0.1 --reps=10 --burns=5000 --iters=100 --file=test4.jld`);
 
-nages = 5
+nages = 4
 clf()
 (mg, env, params) = load("test1.jld", "mg", "env", "params");
 subplot(421)
