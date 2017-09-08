@@ -6,12 +6,12 @@ include("senescence.jl")
 function plotBoxPlot(vals, expect, xticklab, ycolor)
     gcf()[:set_size_inches](4,3)
     ax = gca()
-    bp = boxplot(vals, sym="")
+    bp = PyPlot.boxplot(vals, sym="")
     setp(bp["boxes"], color="black")
     setp(bp["medians"], color=ycolor)
     setp(bp["whiskers"], color="black", dashes=(3,3))
     
-    plot(0:size(vals)[2]+1, fill(expect,size(vals)[2]+2), linestyle="--", dashes=(5,5), color=ycolor)
+    PyPlot.plot(0:size(vals)[2]+1, fill(expect,size(vals)[2]+2), linestyle="--", dashes=(5,5), color=ycolor)
     
     ax[:set_xticklabels](xticklab)
     ax[:set_ylim](-3.0,3.0)
@@ -30,20 +30,21 @@ function landeSlope(A, B, γ, γb, venv, arθ)
     return [A, B / (1 + γb / (γ * v))]
 end
 
-function eigSens(params)
-    nages = length(params.f)
+function eigSens(s, f)
+    nages = length(f)
     # construct Leslie matrix
     projm = zeros(nages, nages)
-    projm[1,:] = params.f
-    projm += diagm(params.s, -1)
+    projm[1,:] = f
+    projm += diagm(s, -1)
 
     # get right (w) and left (v) eigenvectors
     (e, w) = eig(projm)
     (e, v) = eig(projm')
     # find max absolute eigenvalue
     (absemax, imax) = findmax(abs.(e))
-    println(e[imax])
-    return v[:,imax] * w[:,imax]' / (w[:,imax]' * v[:,imax])
+    println("abs max eig: ", e[imax])
+    
+    return real(v[:,imax] * w[:,imax]' / (w[:,imax]' * v[:,imax]))
 end
 
 
@@ -107,3 +108,50 @@ subplot(427)
 plotBoxPlot(mg[1:2:2*nages,:]', landeSlope(params.A, params.B, params.γ, params.γb, params.venv, params.arθ)[1], string.(range(0,10)), "black")
 subplot(428)
 plotBoxPlot(mg[2:2:2*nages,:]', landeSlope(params.A, params.B, params.γ, params.γb, params.venv, params.arθ)[2], string.(range(0,10)), "black")
+
+#### survival and fertility
+
+run(`julia senescence_sim.jl --n=1000 --s="[0.9, 0.7, 0.5, 0.3, 0.1]" --f="[0.01, 0.01, 1.0, 1.0, 1.0, 1.0]" --evolsf="[true,false]" --ve=0.1 --A=2.0 --B=2.0 --γ=0.5 --γb=0 --wmax=0.075 --venv=1.0 --arθ=0.75 --vmut=0.0025 --reps=100 --burns=3000 --iters=100 --file=test_survI.jld`)
+run(`julia senescence_sim.jl --n=1000 --s="[0.1, 0.3, 0.5, 0.7, 0.9]" --f="[0.01, 0.01, 1.0, 1.0, 1.0, 1.0]" --evolsf="[true,false]" --ve=0.1 --A=2.0 --B=2.0 --γ=0.5 --γb=0 --wmax=0.075 --venv=1.0 --arθ=0.75 --vmut=0.0025 --reps=100 --burns=3000 --iters=100 --file=test_survII.jld`)
+run(`julia senescence_sim.jl --n=1000 --s="[0.9, 0.7, 0.5, 0.3, 0.1]" --f="[0.01, 0.01, 1.0, 1.0, 1.0, 1.0]" --evolsf="[false,true]" --ve=0.1 --A=2.0 --B=2.0 --γ=0.5 --γb=0 --wmax=0.075 --venv=1.0 --arθ=0.75 --vmut=0.0025 --reps=100 --burns=3000 --iters=100 --file=test_fertI.jld`)
+run(`julia senescence_sim.jl --n=1000 --s="[0.1, 0.3, 0.5, 0.7, 0.9]" --f="[0.01, 0.01, 1.0, 1.0, 1.0, 1.0]" --evolsf="[false,true]" --ve=0.1 --A=2.0 --B=2.0 --γ=0.5 --γb=0 --wmax=0.075 --venv=1.0 --arθ=0.75 --vmut=0.0025 --reps=100 --burns=3000 --iters=100 --file=test_fertII.jld`)
+
+(mg_s1, env_s1, params_s1) = load("test_survI.jld", "mg", "env", "params");
+(mg_s2, env_s2, params_s2) = load("test_survII.jld", "mg", "env", "params");
+(mg_f1, env_f1, params_f1) = load("test_fertI.jld", "mg", "env", "params");
+(mg_f2, env_f2, params_f2) = load("test_fertII.jld", "mg", "env", "params");
+
+ngenes_s1 = 2 * (params_s1.evolsf[1] * length(params_s1.s) + params_s1.evolsf[2] * length(params_s1.f))
+ngenes_s2 = 2 * (params_s2.evolsf[1] * length(params_s2.s) + params_s2.evolsf[2] * length(params_s2.f))
+ngenes_f1 = 2 * (params_f1.evolsf[1] * length(params_f1.s) + params_f1.evolsf[2] * length(params_f1.f))
+ngenes_f2 = 2 * (params_f2.evolsf[1] * length(params_f2.s) + params_f2.evolsf[2] * length(params_f2.f))
+
+subplot(221); plotBoxPlot(mg_s1[2:2:ngenes_s1,:]', landeSlope(params_s1.A, params_s1.B, params_s1.γ, params_s1.γb, params_s1.venv, params_s1.arθ)[2], string.(range(0,10)), "black")
+subplot(222); plotBoxPlot(mg_s2[2:2:ngenes_s2,:]', landeSlope(params_s2.A, params_s2.B, params_s2.γ, params_s2.γb, params_s2.venv, params_s2.arθ)[2], string.(range(0,10)), "black")
+subplot(223); plotBoxPlot(mg_f1[2:2:ngenes_f1,:]', landeSlope(params_f1.A, params_f1.B, params_f1.γ, params_f1.γb, params_f1.venv, params_f1.arθ)[2], string.(range(0,10)), "black")
+subplot(224); plotBoxPlot(mg_f2[2:2:ngenes_f2,:]', landeSlope(params_f2.A, params_f2.B, params_f2.γ, params_f2.γb, params_f2.venv, params_f2.arθ)[2], string.(range(0,10)), "black")
+
+### Plot strength of selection from matrix sensitivies
+
+clf()
+plot(((x)->x/sum(x))(eigSens(params_s1.s, params_s1.f)[1,:]), "k--")
+plot(((x)->x/sum(x))(eigSens(params_s2.s, params_s2.f)[1,:]), "b--")
+plot(((x)->x/sum(x))(diag(eigSens(params_s1.s, params_s1.f), -1)), "k-")
+plot(((x)->x/sum(x))(diag(eigSens(params_s2.s, params_s2.f), -1)), "b-")
+
+
+### use Seaborn to do boxplots
+
+using Seaborn
+using Pandas
+
+(mg, env, params) = load("test_survI.jld", "mg", "env", "params");
+ngenes = 2 * (params.evolsf[1] * length(params.s) + params.evolsf[2] * length(params.f))
+
+df1 = melt(DataFrame(mg[1:2:ngenes,:]', columns=range(0,convert(Int,ngenes/2))),
+           value_vars=columns(df), var_name="age", value_name="genotypic_value")
+df1["param"] = "intercept"
+df2 = melt(DataFrame(mg[2:2:ngenes,:]', columns=range(0,convert(Int,ngenes/2))),
+           value_vars=columns(df), var_name="age", value_name="genotypic_value")
+df2["param"] = "slope"
+Seaborn.boxplot(x="age", y="genotypic_value", hue="param", data=concat((df1,df2)))
