@@ -60,10 +60,11 @@ run(`julia senescence_sim.jl --n=1000 --s="$(survII)" --f="$(fertII)" --evolsf="
 run(`julia senescence_sim.jl --n=1000 --s="$(survI)" --f="$(fertI)" --evolsf="[false,true]" --ve=0.1 --A=2.0 --B=2.0 --γ=0.5 --γb=0 --wmax=0.075 --venv=1.0 --arθ=0.75 --vmut=0.0025 --reps=100 --burns=3000 --iters=100 --file=sim_$(date)_fertI.jld`)
 run(`julia senescence_sim.jl --n=1000 --s="$(survII)" --f="$(fertII)" --evolsf="[false,true]" --ve=0.1 --A=2.0 --B=2.0 --γ=0.5 --γb=0 --wmax=0.075 --venv=1.0 --arθ=0.75 --vmut=0.0025 --reps=100 --burns=3000 --iters=100 --file=sim_$(date)_fertII.jld`)
 
-(mg_s1, env_s1, params_s1) = load("sim_$(date)_survI.jld", "mg", "env", "params");
-(mg_s2, env_s2, params_s2) = load("sim_$(date)_survII.jld", "mg", "env", "params");
-(mg_f1, env_f1, params_f1) = load("sim_$(date)_fertI.jld", "mg", "env", "params");
-(mg_f2, env_f2, params_f2) = load("sim_$(date)_fertII.jld", "mg", "env", "params");
+simdate = "2017-09-09"
+(mg_s1, env_s1, params_s1) = load("sim_$(simdate)_survI.jld", "mg", "env", "params");
+(mg_s2, env_s2, params_s2) = load("sim_$(simdate)_survII.jld", "mg", "env", "params");
+(mg_f1, env_f1, params_f1) = load("sim_$(simdate)_fertI.jld", "mg", "env", "params");
+(mg_f2, env_f2, params_f2) = load("sim_$(simdate)_fertII.jld", "mg", "env", "params");
 
 ngenes_s1 = 2 * (params_s1.evolsf[1] * length(params_s1.s) + params_s1.evolsf[2] * length(params_s1.f))
 ngenes_s2 = 2 * (params_s2.evolsf[1] * length(params_s2.s) + params_s2.evolsf[2] * length(params_s2.f))
