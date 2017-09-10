@@ -3,20 +3,30 @@ using JLD
 
 include("senescence.jl")
 
-function plotBoxPlot(vals, expect, xticklab, ycolor)
+function plotBoxPlot(vals, expect, xticklab, xlab, yticklab, ylab, lstyle, lcolor)
     gcf()[:set_size_inches](4,3)
     ax = gca()
     bp = PyPlot.boxplot(vals, sym="")
     setp(bp["boxes"], color="black")
-    setp(bp["medians"], color=ycolor)
-    setp(bp["whiskers"], color="black", dashes=(3,3))
+    setp(bp["medians"], visible=false)
+    setp(bp["whiskers"], visible=false)
+    setp(bp["caps"], visible=false)
+
+    PyPlot.plot(1:size(vals)[2], median(vals,1)', linestyle=lstyle, color=lcolor, marker=".", markerfacecolor=lcolor)
+    PyPlot.plot(0:size(vals)[2]+1, fill(expect,size(vals)[2]+2), linestyle=":", color="black")
     
-    PyPlot.plot(0:size(vals)[2]+1, fill(expect,size(vals)[2]+2), linestyle="--", dashes=(5,5), color=ycolor)
-    
-    ax[:set_xticklabels](xticklab)
-    ax[:set_ylim](-3.0,3.0)
-    ax[:set_xlabel]("Age class")
-    ax[:set_ylabel]("Genotypic value")
+    if xticklab != "auto"
+        ax[:set_xticklabels](xticklab)
+    end
+    if yticklab != "auto"
+        ax[:set_yticklabels](yticklab)
+    end
+    ax[:tick_params](direction="in")
+    ax[:set_ylim](-1.5,2.9)
+    ax[:set_xlabel](xlab)
+    ax[:set_ylabel](ylab)
+
+    return gcf()
 end
 
 ## Assume a linear reaction norm with no past time dependence where
@@ -71,16 +81,20 @@ ngenes_s2 = 2 * (params_s2.evolsf[1] * length(params_s2.s) + params_s2.evolsf[2]
 ngenes_f1 = 2 * (params_f1.evolsf[1] * length(params_f1.s) + params_f1.evolsf[2] * length(params_f1.f))
 ngenes_f2 = 2 * (params_f2.evolsf[1] * length(params_f2.s) + params_f2.evolsf[2] * length(params_f2.f))
 
-subplot(221); plotBoxPlot(mg_s1[2:2:ngenes_s1,:]', landeSlope(params_s1.A, params_s1.B, params_s1.γ, params_s1.γb, params_s1.venv, params_s1.arθ)[2], string.(range(0,10)), "black")
-subplot(222); plotBoxPlot(mg_s2[2:2:ngenes_s2,:]', landeSlope(params_s2.A, params_s2.B, params_s2.γ, params_s2.γb, params_s2.venv, params_s2.arθ)[2], string.(range(0,10)), "black")
-subplot(223); plotBoxPlot(mg_f1[2:2:ngenes_f1,:]', landeSlope(params_f1.A, params_f1.B, params_f1.γ, params_f1.γb, params_f1.venv, params_f1.arθ)[2], string.(range(0,10)), "black")
-subplot(224); plotBoxPlot(mg_f2[2:2:ngenes_f2,:]', landeSlope(params_f2.A, params_f2.B, params_f2.γ, params_f2.γb, params_f2.venv, params_f2.arθ)[2], string.(range(0,10)), "black")
+clf(); f1 = plotBoxPlot(mg_s1[2:2:ngenes_s1,:]', landeSlope(params_s1.A, params_s1.B, params_s1.γ, params_s1.γb, params_s1.venv, params_s1.arθ)[2], [], "", "auto", "Genotypic value", "-", "darkgreen"); savefig("sim_$(simdate)_survI.pdf", bbox_inches="tight");
+clf(); plotBoxPlot(mg_s2[2:2:ngenes_s2,:]', landeSlope(params_s2.A, params_s2.B, params_s2.γ, params_s2.γb, params_s2.venv, params_s2.arθ)[2], [], "", [], "", "-", "black"); savefig("sim_$(simdate)_survII.pdf", bbox_inches="tight");
+clf(); plotBoxPlot(mg_f1[2:2:ngenes_f1,:]', landeSlope(params_f1.A, params_f1.B, params_f1.γ, params_f1.γb, params_f1.venv, params_f1.arθ)[2], string.(range(0,10)), "Age class", "auto", "Genotypic value", "--", "darkgreen"); savefig("sim_$(simdate)_fertI.pdf", bbox_inches="tight");
+clf(); plotBoxPlot(mg_f2[2:2:ngenes_f2,:]', landeSlope(params_f2.A, params_f2.B, params_f2.γ, params_f2.γb, params_f2.venv, params_f2.arθ)[2], string.(range(0,10)), "Age class", [], "", "--", "black"); savefig("sim_$(simdate)_fertII.pdf", bbox_inches="tight");
 
 ### Plot strength of selection from matrix sensitivies
 
 clf()
-plot(((x)->x/sum(x))(eigSens(params_s1.s, params_s1.f)[1,:]), "k--")
-plot(((x)->x/sum(x))(eigSens(params_s2.s, params_s2.f)[1,:]), "b--")
-plot(((x)->x/sum(x))(diag(eigSens(params_s1.s, params_s1.f), -1)), "k-")
-plot(((x)->x/sum(x))(diag(eigSens(params_s2.s, params_s2.f), -1)), "b-")
-
+gcf()[:set_size_inches](4,3)
+ax = gca()
+ax[:set_xlabel]("Age class")
+ax[:set_ylabel]("Strength of selection")
+plot(((x)->x/sum(x))(eigSens(params_s1.s, params_s1.f)[1,:]), "--", color="darkgreen")
+plot(((x)->x/sum(x))(eigSens(params_s2.s, params_s2.f)[1,:]), "--", color="black")
+plot(((x)->x/sum(x))(diag(eigSens(params_s1.s, params_s1.f), -1)), "-", color="darkgreen")
+plot(((x)->x/sum(x))(diag(eigSens(params_s2.s, params_s2.f), -1)), "-", color="black")
+savefig("sel_type_I-II_$(simdate).pdf", bbox_inches="tight");
