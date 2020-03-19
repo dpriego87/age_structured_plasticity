@@ -7,7 +7,7 @@ include("environment.jl")
 include("phenotype.jl")
 include("fitness.jl")
 
-using Distributions
+using Distributions, LinearAlgebra
 using PyPlot
 using populations
 
@@ -34,7 +34,7 @@ end
 
 # measure fixation
 function fixation(p, freq0, reps, iters, gvals = [1.0, 0.0])
-    m = 0.0
+    m = zeros(length(p.members[1].genotype))
     for r in 1:reps
         if r % round(reps / 10) == 0
             println(string(round(100*r/reps), "% rep ", r))
@@ -80,7 +80,7 @@ end
 p = Population(# population size
                100,
                # genotype->phenotype map, number of phenotypes
-               phenof, 1, 
+               phenof, 1,
                # fitness function
                fitf,
                # mutation function
@@ -90,21 +90,22 @@ p = Population(# population size
                (e)->[1.0], # env update function
                [1.0]); # initial env state
 
-tic();
+# tic();
 freq0 = 0.1:0.1:0.9
-prob = Array(Float64, length(freq0))
-for i=1:length(freq0)
+prob = Array{Float64}(undef, length(freq0))
+@time for i=1:length(freq0)
     prob[i] = fixation(p, freq0[i], 500, 800)
 end
-toc();
+# toc();
 
 # plot with 95% confidence intervals
 conf = binomialConf(freq0, 500, 0.05)
+pygui(true)
 plot(freq0, freq0, color="blue", linestyle="-")
 plot(freq0, prob, color="black", linestyle="-")
 plot(freq0, conf[1:end,1], color="black", linestyle="--")
 plot(freq0, conf[1:end,2], color="black", linestyle="--")
-
+gcf()
 ##
 ## fixation probability: single advantageous allele
 ##
@@ -126,7 +127,7 @@ end
 p = Population(# population size
                100,
                # genotype->phenotype map, number of phenotypes
-               phenof, 1, 
+               phenof, 1,
                # fitness function
                fitf,
                # mutation function
@@ -136,14 +137,14 @@ p = Population(# population size
                (e)->[1.0], # env update function
                [1.0]); # initial env state
 
-tic();
+# tic();
 freq0 = 0.1:0.1:0.9
 reps = 1000
-prob = Array(Float64, length(freq0))
-for i=1:length(freq0)
+prob = Array{Float64}(undef, length(freq0))
+@time for i=1:length(freq0)
     prob[i] = fixation(p, freq0[i], reps, 800, [0.01, 0.0]) / 0.01
 end
-toc();
+# toc();
 
 
 # plot with 95% confidence intervals using analytical fixation probability
@@ -152,11 +153,12 @@ function fixprob(x, n, s)
 end
 
 conf = binomialConf(map((x)->fixprob(x, 100, 0.01), 0.1:0.1:0.9), reps, 0.05)
+pygui(true)
 plot(freq0, prob, color="blue", linestyle="-")
 plot(freq0, map((x)->fixprob(x, 100, 0.01), 0.1:0.1:0.9), color="black", linestyle="-")
 plot(freq0, conf[1:end,1], color="black", linestyle="--")
 plot(freq0, conf[1:end,2], color="black", linestyle="--")
-
+gcf()
 
 ##
 ## fixtion probability of a neutral allele in an age-structured population
@@ -180,10 +182,10 @@ function fitf(i::Individual,e)
             i.fitness[1] = s2
         elseif i.age == 2
             i.fitness[1] = s3
-        else 
+        else
             i.fitness[1] = 0.0
         end
-        # fertility 
+        # fertility
         i.fitness[2] = 1.0
     end
 end
@@ -209,13 +211,13 @@ function fixationProbAge(s1,s2,s3,psize)
              [s1, 0, 0, 0],
              [0, s2, 0, 0],
              [0, 0, s3, 0])'
-    re, rv = eig(P)
-    le, lv = eig(P')
-    rimax = indmax(abs(re))
-    limax = indmax(abs(le))
+    re, rv = eigen(P)
+    le, lv = eigen(P')
+    rimax = findmax(abs.(re))[2]
+    limax = findmax(abs.(le))[2]
     mrv = rv[:,rimax]
     mlv = lv[:,limax]
-    
+
     return real(mlv / (mlv ⋅ mrv/sum(mrv)) / psize)
 end
 
@@ -235,29 +237,29 @@ end
 
 # measure fixation in neutral population
 function fixation(p, age, reps, iters, gvals = [1.0, 0.0])
-    tic()
+    # tic()
     map((i)->next_gen(p), 1:1000); # iterate population to stable age dist for first run
-    m = 0.0
+    m = zeros(length(p.members[1].genotype))
     for r in 1:reps
         setInitMut(p, age, gvals)
         if r % round(reps / 10) == 0
             println(round(100*r/reps), "% rep ", r)
-            toc()
-            tic()
+            # toc()
+            # tic()
         end
         for i in 1:iters
             next_gen(p)
         end
         m += mean_genotype(p) / reps
     end
-    toq()
+    # toq()
     return m[1]
 end
 
 p = Population(# population size
                100,
                # genotype->phenotype map, number of phenotypes
-               phenof, 1, 
+               phenof, 1,
                # fitness function
                fitf,
                # mutation function
@@ -270,20 +272,21 @@ p = Population(# population size
 
 ages = [0, 1, 2, 3]
 reps = 10000
-prob = Array(Float64, length(ages))
+prob = Array{Float64}(undef,length(ages))
 for i=1:length(ages)
     println("age: ", ages[i])
-    prob[i] = fixation(p, ages[i], reps, 1000)
+    prob[i] = @time fixation(p, ages[i], reps, 1000)
 end
 
 # plot with 95% confidence intervals
 eprob = fixationProbAge(s1,s2,s3,p.size)
 conf = binomialConf(eprob, reps, 0.05)
+pygui(true)
 plot(ages, eprob, color="blue", linestyle="-")
 plot(ages, prob, color="black", linestyle="-")
 plot(ages, conf[1:end,1], color="black", linestyle="--")
 plot(ages, conf[1:end,2], color="black", linestyle="--")
-
+gcf()
 ##
 ## Continuum of alleles, no generation overlap, linear reaction norm with cost of slope.
 ## Test against theory from Lande (2014, JEB)
@@ -331,7 +334,7 @@ function runSim(p, reps, burns, iters)
 
     totalruns = burns+iters
     iterblock = round(reps * totalruns / 100)
-    
+
     for r = 1:reps
         # reset genotypes
         for i = 1:p.size
@@ -346,7 +349,7 @@ function runSim(p, reps, burns, iters)
                 env[:,(r-1)*iters+j-burns]   = p.env_state
             end
             if ((r-1)*totalruns+j) % iterblock == 0
-                print(round(Int,100.*((r-1)*totalruns+j)/(totalruns*reps)), "% ")
+                print(round(Int,100.0*((r-1)*totalruns+j)/(totalruns*reps)), "% ")
             end
         end
     end

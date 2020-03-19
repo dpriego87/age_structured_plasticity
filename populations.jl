@@ -11,7 +11,7 @@ import Base.copy, Base.copy!
 using Distributions
 
 # base type for individuals in the population
-type Individual
+mutable struct Individual
     age::Int64
     genotype::Array{Float64,1}   # vector of genotypes
     phenotype::Array{Float64,1}  # vector of phenotypes
@@ -45,7 +45,7 @@ end
 
 # copy method for Array of Individuals
 function copy(x::Array{Individual,1})
-    y = Array{Individual}(size(x))
+    y = Array{Individual}(undef,size(x))
     for i=1:length(x)
         y[i] = copy(x[i])
     end
@@ -57,7 +57,7 @@ function copy!(x::Array{Individual,1}, y::Array{Individual,1})
     if (length(x) != length(y))
         error("Arrays must have equal length")
     end
-    
+
     for i=1:length(x)
         copy!(x[i], y[i])
     end
@@ -65,7 +65,7 @@ end
 
 # type for population, which is a collection of individuals
 # and population-level properties
-type Population
+mutable struct Population
     size::Int64
     pheno_func::Function            # map genotype to phenotype
     npheno::Int64                   # number of phenotypes for each individual
@@ -85,11 +85,11 @@ type Population
                         pheno_func::Function, npheno::Int64, fit_func::Function,
                         mut_func::Function, geno_func::Function,
                         env_func::Function, env0::Array{Float64,1})
-        
-        members = Array{Individual}(size)
+
+        members = Array{Individual}(undef,size)
         for i=1:size
             g = geno_func(i)
-            ind = Individual(0, g, Array{Float64}(npheno))
+            ind = Individual(0, g, Array{Float64}(undef,npheno))
             pheno_func(ind, env0)
             members[i] = ind
         end
@@ -122,19 +122,19 @@ end
 
 function mean_genotype(pop::Population)
     ngeno = length(pop.members[1].genotype)
-    pop_geno = Array{Float64}(ngeno, pop.size)
-    
+    pop_geno = Array{Float64}(undef,ngeno, pop.size)
+
     for i=1:pop.size
         pop_geno[:,i] = pop.members[i].genotype
     end
 
-    return mean(pop_geno, 2)
+    return mean(pop_geno, dims=2)
 end
 
 function mean_phenotype(pop::Population)
     npheno = length(pop.members[1].phenotype)
-    pop_pheno = Array{Float64}(npheno, pop.size)
-    
+    pop_pheno = Array{Float64}(undef,npheno, pop.size)
+
     for i=1:pop.size
         pop_pheno[:,i] = pop.members[i].phenotype
     end
@@ -143,7 +143,7 @@ function mean_phenotype(pop::Population)
 end
 
 function age_distribution(pop::Population)
-    ages = Array{Float64}(pop.size)
+    ages = Array{Float64}(undef,pop.size)
 
     for i=1:pop.size
         ages[i] = pop.members[i].age
@@ -162,13 +162,13 @@ end
 function next_gen(pop::Population)
     # save initial population state in "prev" vector
     copy!(pop.members_prev, pop.members)
-    
+
     # update fitness values
     calc_pheno_fitness(pop)
-    
+
     # get normalized fertility
     norm_fert = pop.fitness[:,2] / (pop.mean_fit[2] * pop.size)
-    
+
     # set categorical distribution using normalized fertilities ("sampler" uses "AliasTable")
     fertdist = sampler(Categorical(norm_fert))
 
@@ -178,16 +178,16 @@ function next_gen(pop::Population)
             # individual survives and ages
             pop.members[i].age += 1
         else
-            # individual dies and is replaced by random new born 
+            # individual dies and is replaced by random new born
             pop.members[i].age = 0
             parent = rand(fertdist)
             pop.mut_func(pop.members[i], pop.members_prev[parent]) # offspring, parent
         end
     end
-    
+
     # update environmental state
     update_env_state(pop)
-    
+
 end
 
 end
